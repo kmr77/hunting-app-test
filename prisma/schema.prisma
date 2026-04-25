@@ -1,0 +1,401 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  PENDING_VERIFICATION
+  ACTIVE
+  WITHDRAWN
+  SUSPENDED
+}
+
+enum PlanCode {
+  FREE
+  PAID
+  ADMIN
+}
+
+enum RenewalCategory {
+  HUNTING_LICENSE
+  GUN_LICENSE
+  HUNTER_REGISTRATION
+  SKILL_COURSE
+  MEDICAL_CHECK
+  OTHER
+}
+
+enum RenewalStatus {
+  ACTIVE
+  RENEWED
+  EXPIRED
+  ARCHIVED
+}
+
+enum FirearmType {
+  RIFLE
+  SHOTGUN
+  AIR_RIFLE
+  OTHER
+}
+
+enum FirearmStatus {
+  ACTIVE
+  DISPOSED
+  INACTIVE
+}
+
+enum FileCategory {
+  RENEWAL_DOCUMENT
+  LICENSE_COPY
+  MEDICAL_CERTIFICATE
+  TRAINING_CERTIFICATE
+  APPLICATION_FORM
+  OTHER
+}
+
+enum AmmoRecordType {
+  PURCHASE
+  CONSUME
+  ADJUST
+  CARRYOVER
+}
+
+enum AmmoCategory {
+  SHOT_SHELL
+  SLUG
+  RIFLE_ROUND
+  AIR_PELLET
+  OTHER
+}
+
+enum AmmoUnit {
+  ROUND
+}
+
+enum HuntingMethod {
+  GUN
+  TRAP
+  NET
+  OTHER
+}
+
+enum HuntingPurpose {
+  HUNTING
+  PEST_CONTROL
+  TRAINING
+  OTHER
+}
+
+enum HuntingToolType {
+  FIREARM
+  TRAP
+  DOG
+  VEHICLE
+  OTHER
+}
+
+enum ValidationRuleGroup {
+  RENEWAL
+  AMMO
+  HUNTING_EVENT
+  ACCOUNT
+  PRINT
+}
+
+model User {
+  id                     String      @id @default(cuid())
+  email                  String      @unique
+  passwordHash           String
+  status                 UserStatus  @default(PENDING_VERIFICATION)
+  planCode               PlanCode    @default(FREE)
+  emailVerifiedAt        DateTime?
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+  deletedAt              DateTime?
+
+  profile                 UserProfile?
+  renewalRecords          RenewalRecord[]
+  fileRecords             FileRecord[]
+  ammoRecords             AmmoRecord[]
+  huntingEvents           HuntingEvent[]
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens     PasswordResetToken[]
+
+  @@index([status])
+  @@index([planCode])
+  @@index([emailVerifiedAt])
+  @@index([deletedAt])
+  @@index([status, deletedAt])
+  @@map("users")
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([usedAt])
+  @@index([userId, expiresAt])
+  @@index([userId, usedAt, expiresAt])
+  @@map("email_verification_tokens")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([usedAt])
+  @@index([userId, expiresAt])
+  @@index([userId, usedAt, expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model UserProfile {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  lastName              String
+  firstName             String
+  lastNameKana          String?
+  firstNameKana         String?
+  birthDate             DateTime
+  phoneNumber           String?
+  postalCode            String?
+  prefectureCode        String?
+  addressLine1          String?
+  addressLine2          String?
+  onboardingCompletedAt DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  deletedAt             DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([birthDate])
+  @@index([prefectureCode])
+  @@index([onboardingCompletedAt])
+  @@index([deletedAt])
+  @@map("user_profiles")
+}
+
+model RenewalRecord {
+  id                String          @id @default(cuid())
+  userId            String
+  category          RenewalCategory
+  title             String
+  jurisdictionCode  String?
+  targetDate        DateTime?
+  issuedOn          DateTime?
+  expiresOn         DateTime?
+  reminderStartOn   DateTime?
+  status            RenewalStatus   @default(ACTIVE)
+  notes             String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  deletedAt         DateTime?
+
+  user          User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  firearmRecords FirearmRecord[]
+  fileRecords    FileRecord[]
+
+  @@index([userId])
+  @@index([category])
+  @@index([jurisdictionCode])
+  @@index([expiresOn])
+  @@index([reminderStartOn])
+  @@index([status])
+  @@index([deletedAt])
+  @@index([userId, deletedAt])
+  @@index([userId, status, deletedAt])
+  @@index([userId, expiresOn, deletedAt])
+  @@index([jurisdictionCode, category, deletedAt])
+  @@map("renewal_records")
+}
+
+model FirearmRecord {
+  id              String        @id @default(cuid())
+  renewalRecordId String
+  firearmType     FirearmType
+  manufacturer    String?
+  modelName       String?
+  serialNumber    String
+  caliber         String?
+  purposeCode     String?
+  acquiredOn      DateTime?
+  disposedOn      DateTime?
+  status          FirearmStatus @default(ACTIVE)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  deletedAt       DateTime?
+
+  renewalRecord RenewalRecord @relation(fields: [renewalRecordId], references: [id], onDelete: Restrict)
+
+  @@index([renewalRecordId])
+  @@index([firearmType])
+  @@index([serialNumber])
+  @@index([status])
+  @@index([disposedOn])
+  @@index([deletedAt])
+  @@index([renewalRecordId, deletedAt])
+  @@index([firearmType, status, deletedAt])
+  @@map("firearm_records")
+}
+
+model FileRecord {
+  id               String         @id @default(cuid())
+  userId           String
+  renewalRecordId  String?
+  fileCategory     FileCategory
+  storageKey       String         @unique
+  originalFileName String
+  mimeType         String
+  fileSize         Int
+  uploadedAt       DateTime       @default(now())
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  deletedAt        DateTime?
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  renewalRecord RenewalRecord? @relation(fields: [renewalRecordId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([renewalRecordId])
+  @@index([fileCategory])
+  @@index([uploadedAt])
+  @@index([deletedAt])
+  @@index([userId, deletedAt])
+  @@index([renewalRecordId, deletedAt])
+  @@index([fileCategory, deletedAt])
+  @@map("file_records")
+}
+
+model AmmoRecord {
+  id              String         @id @default(cuid())
+  userId          String
+  huntingEventId  String?
+  recordType      AmmoRecordType
+  ammoCategory    AmmoCategory
+  caliber         String?
+  quantity        Int
+  unit            AmmoUnit       @default(ROUND)
+  transactionDate DateTime
+  supplierName    String?
+  slipNumber      String?
+  memo            String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  huntingEvent HuntingEvent? @relation(fields: [huntingEventId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([huntingEventId])
+  @@index([recordType])
+  @@index([ammoCategory])
+  @@index([transactionDate])
+  @@index([deletedAt])
+  @@index([userId, deletedAt])
+  @@index([userId, transactionDate, deletedAt])
+  @@index([userId, ammoCategory, transactionDate, deletedAt])
+  @@index([huntingEventId, recordType, deletedAt])
+  @@map("ammo_records")
+}
+
+model HuntingEvent {
+  id               String          @id @default(cuid())
+  userId           String
+  eventDate        DateTime
+  prefectureCode   String?
+  municipalityCode String?
+  areaName         String?
+  huntingMethod    HuntingMethod?
+  targetSpecies    String?
+  purposeCode      HuntingPurpose?
+  resultCount      Int?
+  notes            String?
+  importedToReportAt DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  deletedAt        DateTime?
+
+  user              User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  ammoRecords       AmmoRecord[]
+  huntingEventTools HuntingEventTool[]
+
+  @@index([userId])
+  @@index([eventDate])
+  @@index([prefectureCode])
+  @@index([municipalityCode])
+  @@index([huntingMethod])
+  @@index([purposeCode])
+  @@index([importedToReportAt])
+  @@index([deletedAt])
+  @@index([userId, deletedAt])
+  @@index([userId, eventDate, deletedAt])
+  @@index([userId, purposeCode, eventDate, deletedAt])
+  @@index([prefectureCode, municipalityCode, eventDate, deletedAt])
+  @@map("hunting_events")
+}
+
+model HuntingEventTool {
+  id             String          @id @default(cuid())
+  huntingEventId String
+  toolType       HuntingToolType
+  toolName       String
+  quantity       Int?
+  notes          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+
+  huntingEvent HuntingEvent @relation(fields: [huntingEventId], references: [id], onDelete: Restrict)
+
+  @@index([huntingEventId])
+  @@index([toolType])
+  @@index([deletedAt])
+  @@index([huntingEventId, deletedAt])
+  @@map("hunting_event_tools")
+}
+
+model ValidationRule {
+  id             String              @id @default(cuid())
+  ruleGroup      ValidationRuleGroup
+  ruleCode       String
+  prefectureCode String              @default("COMMON")
+  version        Int                 @default(1)
+  conditionsJson Json
+  message        String?
+  isActive       Boolean             @default(true)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  deletedAt      DateTime?
+
+  @@unique([ruleGroup, ruleCode, prefectureCode, version])
+  @@index([ruleGroup])
+  @@index([ruleCode])
+  @@index([prefectureCode])
+  @@index([isActive])
+  @@index([deletedAt])
+  @@index([ruleGroup, prefectureCode, isActive, deletedAt])
+  @@index([ruleGroup, ruleCode, prefectureCode, isActive])
+  @@map("validation_rules")
+}
