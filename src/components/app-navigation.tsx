@@ -33,15 +33,21 @@ export function AppNavigation() {
                       href={item.href}
                       className={`flex rounded-[24px] px-4 py-3 transition-colors ${
                         active
-                          ? "bg-emerald-950 text-white shadow-[0_20px_35px_-28px_rgba(6,78,59,0.8)]"
+                          ? "bg-emerald-950 !text-white shadow-[0_20px_35px_-28px_rgba(6,78,59,0.8)]"
                           : "bg-slate-50 text-slate-700 hover:bg-emerald-50 hover:text-emerald-900"
                       }`}
                     >
                       <div className="space-y-1">
-                        <p className="text-sm font-semibold">{item.label}</p>
+                        <p
+                          className={`text-sm font-semibold ${
+                            active ? "!text-white" : "text-slate-700"
+                          }`}
+                        >
+                          {item.label}
+                        </p>
                         <p
                           className={`text-xs leading-6 ${
-                            active ? "text-emerald-100/90" : "text-slate-500"
+                            active ? "!text-white" : "text-slate-500"
                           }`}
                         >
                           {item.description}
@@ -70,16 +76,20 @@ export function AppNavigation() {
                   href={item.href}
                   className={`flex min-h-14 flex-col items-center justify-center rounded-[18px] px-1 text-center transition-colors ${
                     active
-                      ? "bg-emerald-950 text-white"
+                      ? "bg-emerald-950 !text-white"
                       : "bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-900"
                   }`}
                 >
-                  <span className="text-[11px] font-semibold tracking-[0.12em] uppercase">
+                  <span
+                    className={`text-[11px] font-semibold tracking-[0.12em] uppercase ${
+                      active ? "!text-white" : "text-slate-600"
+                    }`}
+                  >
                     {item.shortLabel}
                   </span>
                   <span
                     className={`mt-1 text-[10px] leading-4 ${
-                      active ? "text-emerald-100" : "text-slate-500"
+                      active ? "!text-white" : "text-slate-500"
                     }`}
                   >
                     {item.label}

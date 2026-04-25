@@ -177,7 +177,7 @@ export default async function Home() {
                 </div>
                 <Link
                   href={item.href}
-                  className="mt-4 inline-flex min-h-11 items-center justify-center rounded-full bg-emerald-950 px-4 text-sm font-medium text-white transition-colors hover:bg-emerald-900"
+                  className="mt-4 inline-flex min-h-11 items-center justify-center rounded-full bg-emerald-950 px-4 text-sm font-medium !text-white transition-colors hover:bg-emerald-900"
                 >
                   {item.cta}
                 </Link>

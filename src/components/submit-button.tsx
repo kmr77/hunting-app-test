@@ -12,7 +12,7 @@ type SubmitButtonProps = {
 
 const variantClasses = {
   primary:
-    "bg-emerald-950 text-white hover:bg-emerald-900 disabled:bg-emerald-950/55",
+    "bg-emerald-950 !text-white hover:bg-emerald-900 disabled:bg-emerald-950/55",
   secondary:
     "border border-emerald-200 text-emerald-800 hover:bg-emerald-50 disabled:text-emerald-800/55 disabled:border-emerald-200/60",
   danger:

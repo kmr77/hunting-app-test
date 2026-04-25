@@ -11,7 +11,11 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "db:server": "node scripts/start-prisma-dev.mjs"
+    "env:check": "node --env-file=.env scripts/check-local-env.mjs",
+    "db:check": "node --env-file=.env scripts/check-db.mjs",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push",
+    "prisma:migrate": "prisma migrate dev"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
