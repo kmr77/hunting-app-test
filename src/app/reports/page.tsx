@@ -4,6 +4,7 @@ import {
   upsertHuntingEventAction,
 } from "@/app/actions";
 import { FeedbackBanner } from "@/components/feedback-banner";
+import { ReportLocationFields } from "@/components/reports/report-location-fields";
 import { SubmitButton } from "@/components/submit-button";
 import {
   getDataLoadErrorMessage,
@@ -18,6 +19,7 @@ import {
   type SearchParamsInput,
 } from "@/lib/feedback";
 import { formatDateInput, formatDateLabel } from "@/lib/format";
+import { getPrefectureName } from "@/lib/prefectures";
 import {
   huntingMethodLabels,
   huntingPurposeLabels,
@@ -39,9 +41,12 @@ export default async function ReportsPage({
     getReportPageDataFallback().huntingEvents as Awaited<
       ReturnType<typeof getReportPageData>
     >["huntingEvents"];
+  let municipalitySuggestionsByPrefecture =
+    getReportPageDataFallback().municipalitySuggestionsByPrefecture;
 
   try {
-    ({ huntingEvents } = await getReportPageData());
+    ({ huntingEvents, municipalitySuggestionsByPrefecture } =
+      await getReportPageData());
   } catch (error) {
     feedback ??= {
       variant: "error",
@@ -93,7 +98,7 @@ export default async function ReportsPage({
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[0.95fr,1.05fr]">
+      <section className="grid gap-4">
         <form
           action={upsertHuntingEventAction}
           className="rounded-[30px] border border-emerald-950/10 bg-white/92 p-5 shadow-[0_24px_50px_-36px_rgba(15,23,42,0.38)]"
@@ -105,8 +110,8 @@ export default async function ReportsPage({
             <h3 className="mt-1 text-lg font-semibold">狩猟記録を追加</h3>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1.5 text-sm">
+          <div className="report-form-grid grid grid-cols-1 gap-3 lg:grid-cols-4">
+            <label className="report-date-field min-w-0 space-y-1.5 text-sm">
               <span className="font-medium text-slate-700">実施日</span>
               <input
                 type="date"
@@ -116,7 +121,7 @@ export default async function ReportsPage({
               />
             </label>
 
-            <label className="space-y-1.5 text-sm">
+            <label className="report-select-field min-w-0 space-y-1.5 text-sm">
               <span className="font-medium text-slate-700">猟法</span>
               <select
                 name="huntingMethod"
@@ -131,33 +136,7 @@ export default async function ReportsPage({
               </select>
             </label>
 
-            <input
-              name="prefectureCode"
-              placeholder="都道府県コード"
-              className="min-h-12 rounded-[20px] border border-slate-200 bg-slate-50 px-4 text-sm"
-            />
-            <input
-              name="municipalityCode"
-              placeholder="市区町村コード"
-              className="min-h-12 rounded-[20px] border border-slate-200 bg-slate-50 px-4 text-sm"
-            />
-            <input
-              name="areaName"
-              placeholder="場所"
-              className="min-h-12 rounded-[20px] border border-slate-200 bg-slate-50 px-4 text-sm sm:col-span-2"
-            />
-
-            <label className="space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">対象鳥獣</span>
-              <input
-                name="targetSpecies"
-                required
-                placeholder="例: シカ"
-                className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
-              />
-            </label>
-
-            <label className="space-y-1.5 text-sm">
+            <label className="report-select-field min-w-0 space-y-1.5 text-sm">
               <span className="font-medium text-slate-700">目的</span>
               <select
                 name="purposeCode"
@@ -172,7 +151,7 @@ export default async function ReportsPage({
               </select>
             </label>
 
-            <label className="space-y-1.5 text-sm sm:col-span-2">
+            <label className="report-number-field min-w-0 space-y-1.5 text-sm">
               <span className="font-medium text-slate-700">成果数</span>
               <input
                 type="number"
@@ -183,7 +162,23 @@ export default async function ReportsPage({
               />
             </label>
 
-            <label className="space-y-1.5 text-sm sm:col-span-2">
+            <ReportLocationFields
+              municipalitySuggestionsByPrefecture={
+                municipalitySuggestionsByPrefecture
+              }
+            />
+
+            <label className="report-species-field min-w-0 space-y-1.5 text-sm">
+              <span className="font-medium text-slate-700">対象鳥獣</span>
+              <input
+                name="targetSpecies"
+                required
+                placeholder="例: シカ"
+                className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+              />
+            </label>
+
+            <label className="report-memo-field min-w-0 space-y-1.5 text-sm lg:col-span-4">
               <span className="font-medium text-slate-700">備考</span>
               <textarea
                 name="notes"
@@ -203,11 +198,11 @@ export default async function ReportsPage({
                 MVP では最初の1件だけを登録・更新します。
               </p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="report-tool-grid grid grid-cols-1 gap-3 lg:grid-cols-4">
               <select
                 name="toolType"
                 defaultValue="FIREARM"
-                className="min-h-12 rounded-[18px] border border-emerald-950/10 bg-white px-4 text-sm"
+                className="report-tool-type min-h-12 min-w-0 rounded-[18px] border border-emerald-950/10 bg-white px-4 text-sm"
               >
                 {huntingToolTypeOptions.map((option) => (
                   <option key={option} value={option}>
@@ -218,19 +213,19 @@ export default async function ReportsPage({
               <input
                 name="toolName"
                 placeholder="例: 12番散弾銃"
-                className="min-h-12 rounded-[18px] border border-emerald-950/10 bg-white px-4 text-sm"
+                className="report-tool-name min-h-12 min-w-0 rounded-[18px] border border-emerald-950/10 bg-white px-4 text-sm"
               />
               <input
                 type="number"
                 min={0}
                 name="toolQuantity"
                 defaultValue={1}
-                className="min-h-12 rounded-[18px] border border-emerald-950/10 bg-white px-4 text-sm"
+                className="report-tool-number min-h-12 min-w-0 rounded-[18px] border border-emerald-950/10 bg-white px-4 text-sm"
               />
               <input
                 name="toolNotes"
                 placeholder="道具メモ"
-                className="min-h-12 rounded-[18px] border border-emerald-950/10 bg-white px-4 text-sm"
+                className="report-tool-memo min-h-12 min-w-0 rounded-[18px] border border-emerald-950/10 bg-white px-4 text-sm lg:col-span-4"
               />
             </div>
           </div>
@@ -272,6 +267,7 @@ export default async function ReportsPage({
                         </h3>
                         <p className="text-sm text-slate-600">
                           {formatDateLabel(event.eventDate)} /{" "}
+                          {getPrefectureName(event.prefectureCode)} /{" "}
                           {event.areaName ?? "場所未設定"}
                         </p>
                       </div>
@@ -306,23 +302,12 @@ export default async function ReportsPage({
                         placeholder="対象鳥獣"
                         className="min-h-12 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
                       />
-                      <input
-                        name="areaName"
-                        defaultValue={event.areaName ?? ""}
-                        placeholder="場所"
-                        className="min-h-12 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
-                      />
-                      <input
-                        name="prefectureCode"
-                        defaultValue={event.prefectureCode ?? ""}
-                        placeholder="都道府県コード"
-                        className="min-h-12 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
-                      />
-                      <input
-                        name="municipalityCode"
-                        defaultValue={event.municipalityCode ?? ""}
-                        placeholder="市区町村コード"
-                        className="min-h-12 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
+                      <ReportLocationFields
+                        defaultPrefectureCode={event.prefectureCode}
+                        defaultMunicipalityName={event.areaName}
+                        municipalitySuggestionsByPrefecture={
+                          municipalitySuggestionsByPrefecture
+                        }
                       />
                       <select
                         name="purposeCode"
@@ -351,10 +336,10 @@ export default async function ReportsPage({
                           ? `${huntingToolTypeLabels[primaryTool.toolType]} / ${primaryTool.toolName}`
                           : "未登録"}
                       </p>
-                      <p>弾薬記録の紐付け: {event.ammoRecords.length} 件</p>
+                      <p>弾薬記録の紐付け: {event._count.ammoRecords} 件</p>
                       <p>
                         転記用要約: {formatDateLabel(event.eventDate)} /{" "}
-                        {event.prefectureCode ?? "-"} /{" "}
+                        {getPrefectureName(event.prefectureCode)} /{" "}
                         {event.targetSpecies ?? "未設定"} /{" "}
                         {event.resultCount ?? 0} 頭羽
                       </p>

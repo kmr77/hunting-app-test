@@ -111,7 +111,7 @@ export default async function Home() {
           <p className="mt-3 text-3xl font-semibold text-slate-950">
             {summary.renewals}
           </p>
-          <p className="mt-2 text-sm text-slate-600">対応中の更新記録</p>
+          <p className="mt-2 text-sm text-slate-600">管理中の更新記録</p>
         </article>
         <article className="rounded-[28px] border border-emerald-950/10 bg-white/92 p-5 shadow-[0_22px_40px_-32px_rgba(15,23,42,0.34)]">
           <p className="text-xs font-semibold tracking-[0.18em] text-slate-500 uppercase">

@@ -2,6 +2,7 @@ import {
   AmmoCategory,
   AmmoRecordType,
   FirearmStatus,
+  FirearmBarrelType,
   FirearmType,
   HuntingMethod,
   HuntingPurpose,
@@ -22,10 +23,10 @@ export const renewalCategoryLabels: Record<RenewalCategory, string> = {
 };
 
 export const renewalStatusLabels: Record<RenewalStatus, string> = {
-  ACTIVE: "対応中",
-  RENEWED: "更新済み",
-  EXPIRED: "期限切れ",
-  ARCHIVED: "保管済み",
+  ACTIVE: "管理中",
+  EXPIRED: "要確認",
+  RENEWED: "完了",
+  ARCHIVED: "完了",
 };
 
 export const ammoRecordTypeLabels: Record<AmmoRecordType, string> = {
@@ -82,6 +83,13 @@ export const firearmTypeLabels: Record<FirearmType, string> = {
   RIFLE: "ライフル銃",
   SHOTGUN: "散弾銃",
   AIR_RIFLE: "空気銃",
+  OTHER: "その他",
+};
+
+export const firearmBarrelTypeLabels: Record<FirearmBarrelType, string> = {
+  RIFLED: "ライフル銃身",
+  HALF_RIFLED: "ハーフライフル銃身",
+  SMOOTHBORE: "平筒",
   OTHER: "その他",
 };
 

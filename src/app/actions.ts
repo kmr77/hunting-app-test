@@ -4,6 +4,8 @@ import {
   AmmoCategory,
   AmmoRecordType,
   AmmoUnit,
+  FileCategory,
+  FirearmBarrelType,
   FirearmStatus,
   FirearmType,
   HuntingMethod,
@@ -14,10 +16,24 @@ import {
   RenewalStatus,
   UserStatus,
 } from "@prisma/client";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ensureDemoUser } from "@/lib/app-data";
 import { withPrismaRetry } from "@/lib/prisma";
+
+const PERMIT_IMAGE_UPLOAD_DIR = path.join(
+  process.cwd(),
+  "public",
+  "uploads",
+  "renewal-permits",
+);
+const PERMIT_IMAGE_PUBLIC_DIR = "/uploads/renewal-permits";
+const PERMIT_IMAGE_MAX_BYTES = 1_600_000;
+const PERMIT_IMAGE_MIME_TYPE = "image/webp";
+const RENEWAL_REMINDER_LEAD_DAYS = 90;
 
 function getString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -29,9 +45,107 @@ function getOptionalString(formData: FormData, key: string) {
   return value.length > 0 ? value : null;
 }
 
+function normalizeHalfWidthAlnum(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g, (char) =>
+      String.fromCharCode(char.charCodeAt(0) - 0xfee0),
+    )
+    .trim();
+
+  return normalized.length > 0 ? normalized : null;
+}
+
+function normalizePermitNumber(value: string | null) {
+  const normalized = normalizeHalfWidthAlnum(value);
+  if (!normalized) {
+    return null;
+  }
+
+  const digits = normalized.replace(/[^0-9]/g, "");
+  return digits.length > 0 ? digits : null;
+}
+
+function getOptionalNormalizedString(formData: FormData, key: string) {
+  return normalizeHalfWidthAlnum(getOptionalString(formData, key));
+}
+
+function getOptionalPermitNumber(formData: FormData, key: string) {
+  return normalizePermitNumber(getOptionalString(formData, key));
+}
+
+function getFormDataStrings(formData: FormData, key: string) {
+  return formData
+    .getAll(key)
+    .map((value) => (typeof value === "string" ? value.trim() : ""));
+}
+
+function buildFirearmBarrelInputs(formData: FormData) {
+  const barrelTypes = getFormDataStrings(formData, "barrelType[]");
+  const firearmKinds = getFormDataStrings(formData, "barrelFirearmKind[]");
+  const barrelLengths = getFormDataStrings(formData, "barrelLength[]");
+  const calibers = getFormDataStrings(formData, "barrelCaliber[]");
+  const purposeMemos = getFormDataStrings(formData, "barrelPurposeMemo[]");
+  const riflingRates = getFormDataStrings(formData, "barrelRiflingRate[]");
+  const compatibleAmmos = getFormDataStrings(formData, "barrelCompatibleAmmo[]");
+  const features = getFormDataStrings(formData, "barrelFeatures[]");
+  const notes = getFormDataStrings(formData, "barrelNotes[]");
+
+  return barrelTypes
+    .map((barrelType, index) => ({
+      barrelType: (barrelType || FirearmBarrelType.RIFLED) as FirearmBarrelType,
+      firearmKind: firearmKinds[index]?.trim() || null,
+      barrelLength: normalizeHalfWidthAlnum(barrelLengths[index] ?? ""),
+      caliber: normalizeHalfWidthAlnum(calibers[index] ?? ""),
+      riflingRate: normalizeHalfWidthAlnum(riflingRates[index] ?? ""),
+      compatibleAmmo: normalizeHalfWidthAlnum(compatibleAmmos[index] ?? ""),
+      features: features[index]?.trim() || null,
+      purposeMemo: purposeMemos[index]?.trim() || null,
+      notes: notes[index]?.trim() || null,
+    }))
+    .filter(
+      (barrel) =>
+        barrel.barrelLength ||
+        barrel.caliber ||
+        barrel.firearmKind ||
+        barrel.riflingRate ||
+        barrel.compatibleAmmo ||
+        barrel.features ||
+        barrel.purposeMemo ||
+        barrel.notes ||
+        barrel.barrelType,
+    );
+}
+
+function normalizeMunicipalityName(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.replace(/[\s\u3000]+/g, " ").trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
 function getOptionalDate(formData: FormData, key: string) {
   const value = getOptionalString(formData, key);
   return value ? new Date(value) : null;
+}
+
+function subtractDays(date: Date, days: number) {
+  const result = new Date(date);
+  result.setDate(result.getDate() - days);
+  return result;
+}
+
+function getGeneratedRenewalTitle(category: RenewalCategory) {
+  if (category === RenewalCategory.GUN_LICENSE) {
+    return "銃砲所持許可 更新管理";
+  }
+
+  return "狩猟免許 更新管理";
 }
 
 function getInt(formData: FormData, key: string) {
@@ -73,6 +187,7 @@ async function requireRenewalRecord(id: string, userId: string) {
       },
       select: {
         id: true,
+        category: true,
       },
     }),
   );
@@ -82,6 +197,38 @@ async function requireRenewalRecord(id: string, userId: string) {
   }
 
   return renewal;
+}
+
+function parseCompressedPermitImage(formData: FormData) {
+  const imageData = getString(formData, "compressedImageData");
+  const originalFileName = getOptionalString(formData, "originalFileName");
+
+  if (!imageData) {
+    throw new Error("許可証画像を選択してください。");
+  }
+
+  const match = imageData.match(/^data:image\/webp;base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) {
+    throw new Error("画像の圧縮形式が正しくありません。");
+  }
+
+  const buffer = Buffer.from(match[1], "base64");
+  if (buffer.byteLength <= 0) {
+    throw new Error("画像データが空です。");
+  }
+
+  if (buffer.byteLength > PERMIT_IMAGE_MAX_BYTES) {
+    throw new Error("圧縮後の画像サイズが大きすぎます。");
+  }
+
+  return {
+    buffer,
+    originalFileName: originalFileName ?? "permit-image.webp",
+  };
+}
+
+function publicStorageKey(fileName: string) {
+  return `${PERMIT_IMAGE_PUBLIC_DIR}/${fileName}`;
 }
 
 async function requireAmmoRecord(id: string, userId: string) {
@@ -129,25 +276,33 @@ async function requireHuntingEvent(id: string, userId: string) {
 export async function upsertRenewalAction(formData: FormData) {
   const pathname = "/renewals";
   const id = getOptionalString(formData, "id");
-  const title = getString(formData, "title");
+  const category = getString(formData, "category") as RenewalCategory;
   const expiresOn = getOptionalDate(formData, "expiresOn");
 
-  if (!title) {
-    redirectWithMessage(pathname, "error", "タイトルを入力してください。");
+  if (!isValidDate(expiresOn)) {
+    redirectWithMessage(pathname, "error", "有効期限日を入力してください。");
   }
 
-  if (!isValidDate(expiresOn)) {
-    redirectWithMessage(pathname, "error", "期限日を入力してください。");
-  }
+  const targetDate = expiresOn;
+  const reminderStartOn = targetDate
+    ? subtractDays(targetDate, RENEWAL_REMINDER_LEAD_DAYS)
+    : null;
 
   const payload = {
-    category: getString(formData, "category") as RenewalCategory,
-    title,
+    category,
+    title: getGeneratedRenewalTitle(category),
     jurisdictionCode: getOptionalString(formData, "jurisdictionCode"),
-    targetDate: getOptionalDate(formData, "targetDate"),
+    targetDate,
     issuedOn: getOptionalDate(formData, "issuedOn"),
     expiresOn,
-    reminderStartOn: getOptionalDate(formData, "reminderStartOn"),
+    reminderStartOn,
+    originalPermittedOn: getOptionalDate(formData, "originalPermittedOn"),
+    originalPermitNumber: getOptionalPermitNumber(formData, "originalPermitNumber"),
+    permitNumber: getOptionalPermitNumber(formData, "permitNumber"),
+    confirmedOn: getOptionalDate(formData, "confirmedOn"),
+    applicationStartOn: getOptionalDate(formData, "applicationStartOn"),
+    applicationEndOn: getOptionalDate(formData, "applicationEndOn"),
+    validityDescription: getOptionalString(formData, "validityDescription"),
     status: getString(formData, "status") as RenewalStatus,
     notes: getOptionalString(formData, "notes"),
   };
@@ -172,22 +327,36 @@ export async function upsertRenewalAction(formData: FormData) {
         }),
       );
 
-      const serialNumber = getOptionalString(formData, "serialNumber");
+      const serialNumber = getOptionalNormalizedString(formData, "serialNumber");
       if (serialNumber) {
         await withPrismaRetry((prisma) =>
           prisma.firearmRecord.create({
             data: {
               renewalRecordId: renewal.id,
+              displayName: getString(formData, "firearmDisplayName"),
               firearmType:
                 (getOptionalString(formData, "firearmType") as FirearmType) ??
                 FirearmType.SHOTGUN,
               serialNumber,
-              manufacturer: getOptionalString(formData, "manufacturer"),
-              modelName: getOptionalString(formData, "modelName"),
-              caliber: getOptionalString(formData, "caliber"),
+              manufacturer: getOptionalNormalizedString(formData, "manufacturer"),
+              modelName: getOptionalNormalizedString(formData, "modelName"),
+              caliber: getOptionalNormalizedString(formData, "caliber"),
+              totalLength: getOptionalNormalizedString(formData, "firearmTotalLength"),
+              barrelLength: getOptionalNormalizedString(formData, "firearmBarrelLength"),
+              riflingRate: getOptionalNormalizedString(formData, "firearmRiflingRate"),
+              magazineSpec: getOptionalString(formData, "firearmMagazineSpec"),
+              compatibleAmmo: getOptionalNormalizedString(formData, "firearmCompatibleAmmo"),
+              features: getOptionalString(formData, "firearmFeatures"),
+              purposeText: getOptionalString(formData, "firearmPurposeText"),
+              permittedOn: getOptionalDate(formData, "firearmPermittedOn"),
+              expiresOn: getOptionalDate(formData, "firearmExpiresOn"),
+              notes: getOptionalString(formData, "firearmNotes"),
               status:
                 (getOptionalString(formData, "firearmStatus") as FirearmStatus) ??
                 FirearmStatus.ACTIVE,
+              barrelRecords: {
+                create: buildFirearmBarrelInputs(formData),
+              },
             },
           }),
         );
@@ -229,6 +398,13 @@ export async function deleteRenewalAction(formData: FormData) {
     );
 
     await withPrismaRetry((prisma) =>
+      prisma.fileRecord.updateMany({
+        where: { renewalRecordId: id, deletedAt: null },
+        data: { deletedAt: new Date() },
+      }),
+    );
+
+    await withPrismaRetry((prisma) =>
       prisma.renewalRecord.update({
         where: { id },
         data: { deletedAt: new Date() },
@@ -242,6 +418,438 @@ export async function deleteRenewalAction(formData: FormData) {
 
   revalidateAppPaths("/", "/renewals", "/account");
   redirectWithMessage(pathname, "success", "更新記録を削除しました。");
+}
+
+export async function updateRenewalPermitInfoAction(formData: FormData) {
+  const pathname = "/renewals";
+  const id = getString(formData, "id");
+  const expiresOn = getOptionalDate(formData, "expiresOn");
+
+  if (!id) {
+    redirectWithMessage(pathname, "error", "更新記録が見つかりません。");
+  }
+
+  if (!isValidDate(expiresOn)) {
+    redirectWithMessage(pathname, "error", "有効期限日を入力してください。");
+  }
+
+  try {
+    const user = await ensureDemoUser();
+    const renewal = await requireRenewalRecord(id, user.id);
+    const category = renewal.category;
+    const reminderStartOn = expiresOn
+      ? subtractDays(expiresOn, RENEWAL_REMINDER_LEAD_DAYS)
+      : null;
+
+    await withPrismaRetry((prisma) =>
+      prisma.renewalRecord.update({
+        where: { id },
+        data: {
+          category,
+          title: getGeneratedRenewalTitle(category),
+          issuedOn: getOptionalDate(formData, "issuedOn"),
+          expiresOn,
+          targetDate: expiresOn,
+          reminderStartOn,
+          originalPermittedOn: getOptionalDate(formData, "originalPermittedOn"),
+          originalPermitNumber: getOptionalPermitNumber(formData, "originalPermitNumber"),
+          permitNumber: getOptionalPermitNumber(formData, "permitNumber"),
+          confirmedOn: getOptionalDate(formData, "confirmedOn"),
+          applicationStartOn: getOptionalDate(formData, "applicationStartOn"),
+          applicationEndOn: getOptionalDate(formData, "applicationEndOn"),
+          validityDescription: getOptionalString(formData, "validityDescription"),
+          status: getString(formData, "status") as RenewalStatus,
+          notes: getOptionalString(formData, "notes"),
+        },
+      }),
+    );
+  } catch (error) {
+    redirectWithMessage(
+      pathname,
+      "error",
+      error instanceof Error ? error.message : "許可証情報の更新に失敗しました。",
+    );
+  }
+
+  revalidateAppPaths("/", "/renewals");
+  redirectWithMessage(pathname, "success", "許可証情報を更新しました。");
+}
+
+export async function updateFirearmRecordAction(formData: FormData) {
+  const pathname = "/renewals";
+  const id = getString(formData, "id");
+
+  if (!id) {
+    redirectWithMessage(pathname, "error", "所持銃情報が見つかりません。");
+  }
+
+  try {
+    const user = await ensureDemoUser();
+    const firearm = await withPrismaRetry((prisma) =>
+      prisma.firearmRecord.findFirst({
+        where: {
+          id,
+          deletedAt: null,
+          renewalRecord: {
+            userId: user.id,
+            deletedAt: null,
+          },
+        },
+        select: { id: true },
+      }),
+    );
+
+    if (!firearm) {
+      throw new Error("所持銃情報が見つかりません。");
+    }
+
+    await withPrismaRetry((prisma) =>
+      prisma.firearmRecord.update({
+        where: { id: firearm.id },
+        data: {
+          displayName: getString(formData, "firearmDisplayName"),
+          firearmType:
+            (getOptionalString(formData, "firearmType") as FirearmType) ??
+            FirearmType.SHOTGUN,
+          manufacturer: getOptionalNormalizedString(formData, "manufacturer"),
+          modelName: getOptionalNormalizedString(formData, "modelName"),
+          serialNumber: getOptionalNormalizedString(formData, "serialNumber") ?? "",
+          caliber: getOptionalNormalizedString(formData, "caliber"),
+          totalLength: getOptionalNormalizedString(formData, "firearmTotalLength"),
+          barrelLength: getOptionalNormalizedString(formData, "firearmBarrelLength"),
+          riflingRate: getOptionalNormalizedString(formData, "firearmRiflingRate"),
+          magazineSpec: getOptionalString(formData, "firearmMagazineSpec"),
+          compatibleAmmo: getOptionalNormalizedString(formData, "firearmCompatibleAmmo"),
+          features: getOptionalString(formData, "firearmFeatures"),
+          purposeText: getOptionalString(formData, "firearmPurposeText"),
+          permittedOn: getOptionalDate(formData, "firearmPermittedOn"),
+          expiresOn: getOptionalDate(formData, "firearmExpiresOn"),
+          notes: getOptionalString(formData, "firearmNotes"),
+          status:
+            (getOptionalString(formData, "firearmStatus") as FirearmStatus) ??
+            FirearmStatus.ACTIVE,
+        },
+      }),
+    );
+  } catch (error) {
+    redirectWithMessage(
+      pathname,
+      "error",
+      error instanceof Error ? error.message : "所持銃情報の更新に失敗しました。",
+    );
+  }
+
+  revalidateAppPaths("/renewals");
+  redirectWithMessage(pathname, "success", "所持銃情報を更新しました。");
+}
+
+export async function updateFirearmBarrelRecordAction(formData: FormData) {
+  const pathname = "/renewals";
+  const id = getString(formData, "id");
+
+  if (!id) {
+    redirectWithMessage(pathname, "error", "銃身情報が見つかりません。");
+  }
+
+  try {
+    const user = await ensureDemoUser();
+    const barrel = await withPrismaRetry((prisma) =>
+      prisma.firearmBarrelRecord.findFirst({
+        where: {
+          id,
+          deletedAt: null,
+          firearmRecord: {
+            deletedAt: null,
+            renewalRecord: {
+              userId: user.id,
+              deletedAt: null,
+            },
+          },
+        },
+        select: { id: true },
+      }),
+    );
+
+    if (!barrel) {
+      throw new Error("銃身情報が見つかりません。");
+    }
+
+    await withPrismaRetry((prisma) =>
+      prisma.firearmBarrelRecord.update({
+        where: { id: barrel.id },
+        data: {
+          barrelType:
+            (getOptionalString(formData, "barrelType") as FirearmBarrelType) ??
+            FirearmBarrelType.RIFLED,
+          firearmKind: getOptionalString(formData, "barrelFirearmKind"),
+          barrelLength: getOptionalNormalizedString(formData, "barrelLength"),
+          caliber: getOptionalNormalizedString(formData, "barrelCaliber"),
+          riflingRate: getOptionalNormalizedString(formData, "barrelRiflingRate"),
+          compatibleAmmo: getOptionalNormalizedString(formData, "barrelCompatibleAmmo"),
+          features: getOptionalString(formData, "barrelFeatures"),
+          purposeMemo: getOptionalString(formData, "barrelPurposeMemo"),
+          notes: getOptionalString(formData, "barrelNotes"),
+        },
+      }),
+    );
+  } catch (error) {
+    redirectWithMessage(
+      pathname,
+      "error",
+      error instanceof Error ? error.message : "銃身情報の更新に失敗しました。",
+    );
+  }
+
+  revalidateAppPaths("/renewals");
+  redirectWithMessage(pathname, "success", "銃身情報を更新しました。");
+}
+
+export async function createFirearmBarrelRecordAction(formData: FormData) {
+  const pathname = "/renewals";
+  const firearmRecordId = getString(formData, "firearmRecordId");
+
+  if (!firearmRecordId) {
+    redirectWithMessage(pathname, "error", "所持銃情報が見つかりません。");
+  }
+
+  try {
+    const user = await ensureDemoUser();
+    const firearm = await withPrismaRetry((prisma) =>
+      prisma.firearmRecord.findFirst({
+        where: {
+          id: firearmRecordId,
+          deletedAt: null,
+          renewalRecord: {
+            userId: user.id,
+            deletedAt: null,
+          },
+        },
+        select: { id: true },
+      }),
+    );
+
+    if (!firearm) {
+      throw new Error("所持銃情報が見つかりません。");
+    }
+
+    await withPrismaRetry((prisma) =>
+      prisma.firearmBarrelRecord.create({
+        data: {
+          firearmRecordId: firearm.id,
+          barrelType:
+            (getOptionalString(formData, "barrelType") as FirearmBarrelType) ??
+            FirearmBarrelType.RIFLED,
+          firearmKind: getOptionalString(formData, "barrelFirearmKind"),
+          barrelLength: getOptionalNormalizedString(formData, "barrelLength"),
+          caliber: getOptionalNormalizedString(formData, "barrelCaliber"),
+          riflingRate: getOptionalNormalizedString(formData, "barrelRiflingRate"),
+          compatibleAmmo: getOptionalNormalizedString(formData, "barrelCompatibleAmmo"),
+          features: getOptionalString(formData, "barrelFeatures"),
+          purposeMemo: getOptionalString(formData, "barrelPurposeMemo"),
+          notes: getOptionalString(formData, "barrelNotes"),
+        },
+      }),
+    );
+  } catch (error) {
+    redirectWithMessage(
+      pathname,
+      "error",
+      error instanceof Error ? error.message : "銃身情報の追加に失敗しました。",
+    );
+  }
+
+  revalidateAppPaths("/renewals");
+  redirectWithMessage(pathname, "success", "銃身情報を追加しました。");
+}
+
+export async function deleteFirearmBarrelRecordAction(formData: FormData) {
+  const pathname = "/renewals";
+  const id = getString(formData, "id");
+
+  if (!id) {
+    redirectWithMessage(pathname, "error", "銃身情報が見つかりません。");
+  }
+
+  try {
+    const user = await ensureDemoUser();
+    const barrel = await withPrismaRetry((prisma) =>
+      prisma.firearmBarrelRecord.findFirst({
+        where: {
+          id,
+          deletedAt: null,
+          firearmRecord: {
+            deletedAt: null,
+            renewalRecord: {
+              userId: user.id,
+              deletedAt: null,
+            },
+          },
+        },
+        select: { id: true },
+      }),
+    );
+
+    if (!barrel) {
+      throw new Error("銃身情報が見つかりません。");
+    }
+
+    await withPrismaRetry((prisma) =>
+      prisma.firearmBarrelRecord.update({
+        where: { id: barrel.id },
+        data: { deletedAt: new Date() },
+      }),
+    );
+  } catch (error) {
+    redirectWithMessage(
+      pathname,
+      "error",
+      error instanceof Error ? error.message : "銃身情報の削除に失敗しました。",
+    );
+  }
+
+  revalidateAppPaths("/renewals");
+  redirectWithMessage(pathname, "success", "銃身情報を削除しました。");
+}
+
+export async function uploadRenewalPermitImageAction(formData: FormData) {
+  const pathname = "/renewals";
+  const renewalRecordId = getString(formData, "renewalRecordId");
+
+  if (!renewalRecordId) {
+    redirectWithMessage(pathname, "error", "更新記録が見つかりません。");
+  }
+
+  try {
+    const user = await ensureDemoUser();
+    const renewal = await requireRenewalRecord(renewalRecordId, user.id);
+
+    if (renewal.category !== RenewalCategory.GUN_LICENSE) {
+      throw new Error("許可証画像は銃砲所持許可にのみ登録できます。");
+    }
+
+    const { buffer, originalFileName } = parseCompressedPermitImage(formData);
+    await mkdir(PERMIT_IMAGE_UPLOAD_DIR, { recursive: true });
+
+    const fileName = `${renewalRecordId}-${randomUUID()}.webp`;
+    const filePath = path.join(PERMIT_IMAGE_UPLOAD_DIR, fileName);
+    const storageKey = publicStorageKey(fileName);
+
+    const previousFiles = await withPrismaRetry((prisma) =>
+      prisma.fileRecord.findMany({
+        where: {
+          userId: user.id,
+          renewalRecordId,
+          fileCategory: FileCategory.LICENSE_COPY,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          storageKey: true,
+        },
+      }),
+    );
+
+    await writeFile(filePath, buffer);
+
+    await withPrismaRetry((prisma) =>
+      prisma.$transaction([
+        prisma.fileRecord.updateMany({
+          where: {
+            userId: user.id,
+            renewalRecordId,
+            fileCategory: FileCategory.LICENSE_COPY,
+            deletedAt: null,
+          },
+          data: { deletedAt: new Date() },
+        }),
+        prisma.fileRecord.create({
+          data: {
+            userId: user.id,
+            renewalRecordId,
+            fileCategory: FileCategory.LICENSE_COPY,
+            storageKey,
+            originalFileName,
+            mimeType: PERMIT_IMAGE_MIME_TYPE,
+            fileSize: buffer.byteLength,
+          },
+        }),
+      ]),
+    );
+
+    await Promise.allSettled(
+      previousFiles
+        .filter((file) => file.storageKey.startsWith(PERMIT_IMAGE_PUBLIC_DIR))
+        .map((file) =>
+          unlink(path.join(process.cwd(), "public", file.storageKey.slice(1))),
+        ),
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "許可証画像の保存に失敗しました。";
+    redirectWithMessage(pathname, "error", message);
+  }
+
+  revalidateAppPaths("/", "/renewals", "/account");
+  redirectWithMessage(pathname, "success", "許可証画像を保存しました。");
+}
+
+export async function deleteRenewalPermitImageAction(formData: FormData) {
+  const pathname = "/renewals";
+  const renewalRecordId = getString(formData, "renewalRecordId");
+  const fileRecordId = getString(formData, "fileRecordId");
+
+  if (!renewalRecordId || !fileRecordId) {
+    redirectWithMessage(pathname, "error", "削除対象の画像が見つかりません。");
+  }
+
+  try {
+    const user = await ensureDemoUser();
+    await requireRenewalRecord(renewalRecordId, user.id);
+
+    const file = await withPrismaRetry((prisma) =>
+      prisma.fileRecord.findFirst({
+        where: {
+          id: fileRecordId,
+          userId: user.id,
+          renewalRecordId,
+          fileCategory: FileCategory.LICENSE_COPY,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          storageKey: true,
+        },
+      }),
+    );
+
+    if (!file) {
+      throw new Error("削除対象の画像が見つかりません。");
+    }
+
+    await withPrismaRetry((prisma) =>
+      prisma.fileRecord.update({
+        where: { id: file.id },
+        data: { deletedAt: new Date() },
+      }),
+    );
+
+    if (file.storageKey.startsWith(PERMIT_IMAGE_PUBLIC_DIR)) {
+      await unlink(path.join(process.cwd(), "public", file.storageKey.slice(1))).catch(
+        () => undefined,
+      );
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "許可証画像の削除に失敗しました。";
+    redirectWithMessage(pathname, "error", message);
+  }
+
+  revalidateAppPaths("/", "/renewals", "/account");
+  redirectWithMessage(pathname, "success", "許可証画像を削除しました。");
 }
 
 export async function upsertAmmoAction(formData: FormData) {
@@ -365,8 +973,8 @@ export async function upsertHuntingEventAction(formData: FormData) {
   const payload = {
     eventDate: safeEventDate,
     prefectureCode: getOptionalString(formData, "prefectureCode"),
-    municipalityCode: getOptionalString(formData, "municipalityCode"),
-    areaName: getOptionalString(formData, "areaName"),
+    municipalityCode: null,
+    areaName: normalizeMunicipalityName(getOptionalString(formData, "areaName")),
     huntingMethod: getOptionalString(formData, "huntingMethod") as
       | HuntingMethod
       | null,

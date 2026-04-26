@@ -57,3 +57,42 @@ textarea:focus {
 ::selection {
   background: rgba(31, 122, 77, 0.16);
 }
+
+@media (min-width: 768px) {
+  .report-form-grid {
+    max-width: 100%;
+    align-items: start;
+    overflow-x: hidden;
+  }
+
+  .report-date-field,
+  .report-select-field,
+  .report-number-field,
+  .report-prefecture-field,
+  .report-area-field,
+  .report-species-field {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .report-memo-field {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .report-tool-grid {
+    align-items: start;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .report-tool-number {
+    max-width: 120px;
+  }
+
+  .report-tool-memo {
+    max-width: 100%;
+    min-width: 0;
+  }
+}

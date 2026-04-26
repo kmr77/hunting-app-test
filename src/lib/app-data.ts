@@ -2,6 +2,7 @@ import {
   AmmoCategory,
   AmmoRecordType,
   FirearmStatus,
+  FirearmBarrelType,
   FirearmType,
   HuntingMethod,
   HuntingPurpose,
@@ -123,6 +124,7 @@ export function getAmmoPageDataFallback() {
 export function getReportPageDataFallback() {
   return {
     huntingEvents: [],
+    municipalitySuggestionsByPrefecture: {},
   };
 }
 
@@ -213,6 +215,37 @@ export async function getRenewalPageData() {
         userId: user.id,
         deletedAt: null,
       },
+      include: {
+        fileRecords: {
+          where: {
+            deletedAt: null,
+          },
+          select: {
+            id: true,
+            fileCategory: true,
+            storageKey: true,
+            originalFileName: true,
+            mimeType: true,
+            fileSize: true,
+            uploadedAt: true,
+          },
+          orderBy: { uploadedAt: "desc" },
+        },
+        firearmRecords: {
+          where: {
+            deletedAt: null,
+          },
+          include: {
+            barrelRecords: {
+              where: {
+                deletedAt: null,
+              },
+              orderBy: { createdAt: "asc" },
+            },
+          },
+          orderBy: { createdAt: "asc" },
+        },
+      },
       orderBy: [{ expiresOn: "asc" }, { createdAt: "desc" }],
     }),
   );
@@ -247,34 +280,84 @@ export async function getAmmoPageData() {
 export async function getReportPageData() {
   const user = await ensureDemoUser();
 
-  const huntingEvents = await withPrismaRetry((prisma) =>
-    prisma.huntingEvent.findMany({
-      where: {
-        userId: user.id,
-        deletedAt: null,
-      },
-      include: {
-        huntingEventTools: {
+  const [huntingEvents, municipalitySuggestionRows] = await withPrismaRetry(
+    (prisma) =>
+      Promise.all([
+        prisma.huntingEvent.findMany({
           where: {
-            deletedAt: null,
-          },
-          orderBy: { createdAt: "asc" },
-        },
-        ammoRecords: {
-          where: {
+            userId: user.id,
             deletedAt: null,
           },
           select: {
             id: true,
+            eventDate: true,
+            prefectureCode: true,
+            municipalityCode: true,
+            areaName: true,
+            huntingMethod: true,
+            targetSpecies: true,
+            purposeCode: true,
+            resultCount: true,
+            notes: true,
+            importedToReportAt: true,
+            huntingEventTools: {
+              where: {
+                deletedAt: null,
+              },
+              select: {
+                id: true,
+                toolType: true,
+                toolName: true,
+                quantity: true,
+                notes: true,
+              },
+              orderBy: { createdAt: "asc" },
+            },
+            _count: {
+              select: {
+                ammoRecords: {
+                  where: {
+                    deletedAt: null,
+                  },
+                },
+              },
+            },
           },
-          orderBy: { transactionDate: "asc" },
-        },
-      },
-      orderBy: [{ eventDate: "desc" }, { createdAt: "desc" }],
-    }),
+          orderBy: [{ eventDate: "desc" }, { createdAt: "desc" }],
+        }),
+        prisma.huntingEvent.findMany({
+          where: {
+            userId: user.id,
+            deletedAt: null,
+            areaName: {
+              not: null,
+            },
+          },
+          select: {
+            prefectureCode: true,
+            areaName: true,
+          },
+          distinct: ["prefectureCode", "areaName"],
+          orderBy: [{ prefectureCode: "asc" }, { areaName: "asc" }],
+        }),
+      ]),
   );
 
-  return { user, huntingEvents };
+  const municipalitySuggestionsByPrefecture =
+    municipalitySuggestionRows.reduce<Record<string, string[]>>((result, row) => {
+      if (!row.prefectureCode || !row.areaName) {
+        return result;
+      }
+
+      result[row.prefectureCode] ??= [];
+      if (!result[row.prefectureCode].includes(row.areaName)) {
+        result[row.prefectureCode].push(row.areaName);
+      }
+
+      return result;
+    }, {});
+
+  return { user, huntingEvents, municipalitySuggestionsByPrefecture };
 }
 
 export async function getAccountPageData() {
@@ -308,17 +391,12 @@ export async function getAccountPageData() {
 export const renewalCategoryOptions = [
   RenewalCategory.HUNTING_LICENSE,
   RenewalCategory.GUN_LICENSE,
-  RenewalCategory.HUNTER_REGISTRATION,
-  RenewalCategory.SKILL_COURSE,
-  RenewalCategory.MEDICAL_CHECK,
-  RenewalCategory.OTHER,
 ];
 
 export const renewalStatusOptions = [
   RenewalStatus.ACTIVE,
-  RenewalStatus.RENEWED,
   RenewalStatus.EXPIRED,
-  RenewalStatus.ARCHIVED,
+  RenewalStatus.RENEWED,
 ];
 
 export const ammoRecordTypeOptions = [
@@ -371,7 +449,13 @@ export const firearmTypeOptions = [
   FirearmType.RIFLE,
   FirearmType.SHOTGUN,
   FirearmType.AIR_RIFLE,
-  FirearmType.OTHER,
+];
+
+export const firearmBarrelTypeOptions = [
+  FirearmBarrelType.RIFLED,
+  FirearmBarrelType.HALF_RIFLED,
+  FirearmBarrelType.SMOOTHBORE,
+  FirearmBarrelType.OTHER,
 ];
 
 export const firearmStatusOptions = [

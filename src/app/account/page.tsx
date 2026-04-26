@@ -69,7 +69,7 @@ export default async function AccountPage({
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[0.95fr,1.05fr]">
+      <section className="grid gap-4">
         <form
           action={updateAccountAction}
           className="rounded-[30px] border border-emerald-950/10 bg-white/92 p-5 shadow-[0_24px_50px_-36px_rgba(15,23,42,0.38)]"
@@ -81,8 +81,28 @@ export default async function AccountPage({
             <h3 className="mt-1 text-lg font-semibold">プロフィールを更新</h3>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1.5 text-sm sm:col-span-2">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+            <label className="min-w-0 space-y-1.5 text-sm">
+              <span className="font-medium text-slate-700">姓</span>
+              <input
+                name="lastName"
+                required
+                defaultValue={profile?.lastName ?? ""}
+                className="min-h-12 w-full min-w-0 rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+              />
+            </label>
+
+            <label className="min-w-0 space-y-1.5 text-sm">
+              <span className="font-medium text-slate-700">名</span>
+              <input
+                name="firstName"
+                required
+                defaultValue={profile?.firstName ?? ""}
+                className="min-h-12 w-full min-w-0 rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+              />
+            </label>
+
+            <label className="min-w-0 space-y-1.5 text-sm">
               <span className="font-medium text-slate-700">メールアドレス</span>
               <input
                 name="email"
@@ -93,7 +113,27 @@ export default async function AccountPage({
               />
             </label>
 
-            <label className="space-y-1.5 text-sm">
+            <label className="min-w-0 space-y-1.5 text-sm">
+              <span className="font-medium text-slate-700">電話番号</span>
+              <input
+                name="phoneNumber"
+                defaultValue={profile?.phoneNumber ?? ""}
+                placeholder="例: 090-0000-0000"
+                className="min-h-12 w-full min-w-0 rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+              />
+            </label>
+
+            <label className="min-w-0 space-y-1.5 text-sm">
+              <span className="font-medium text-slate-700">生年月日</span>
+              <input
+                type="date"
+                name="birthDate"
+                defaultValue={formatDateInput(profile?.birthDate)}
+                className="min-h-12 w-full min-w-0 rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+              />
+            </label>
+
+            <label className="min-w-0 space-y-1.5 text-sm">
               <span className="font-medium text-slate-700">利用状態</span>
               <select
                 name="status"
@@ -108,7 +148,7 @@ export default async function AccountPage({
               </select>
             </label>
 
-            <label className="space-y-1.5 text-sm">
+            <label className="min-w-0 space-y-1.5 text-sm">
               <span className="font-medium text-slate-700">プラン</span>
               <select
                 name="planCode"
@@ -123,50 +163,19 @@ export default async function AccountPage({
               </select>
             </label>
 
-            <input
-              name="lastName"
-              required
-              defaultValue={profile?.lastName ?? ""}
-              placeholder="姓"
-              className="min-h-12 rounded-[20px] border border-slate-200 bg-slate-50 px-4"
-            />
-            <input
-              name="firstName"
-              required
-              defaultValue={profile?.firstName ?? ""}
-              placeholder="名"
-              className="min-h-12 rounded-[20px] border border-slate-200 bg-slate-50 px-4"
-            />
-            <input
-              type="date"
-              name="birthDate"
-              defaultValue={formatDateInput(profile?.birthDate)}
-              className="min-h-12 rounded-[20px] border border-slate-200 bg-slate-50 px-4"
-            />
-            <input
-              name="phoneNumber"
-              defaultValue={profile?.phoneNumber ?? ""}
-              placeholder="電話番号"
-              className="min-h-12 rounded-[20px] border border-slate-200 bg-slate-50 px-4"
-            />
-            <input
-              name="prefectureCode"
-              defaultValue={profile?.prefectureCode ?? ""}
-              placeholder="都道府県コード"
-              className="min-h-12 rounded-[20px] border border-slate-200 bg-slate-50 px-4"
-            />
-            <input
-              name="addressLine1"
-              defaultValue={profile?.addressLine1 ?? ""}
-              placeholder="住所1"
-              className="min-h-12 rounded-[20px] border border-slate-200 bg-slate-50 px-4 sm:col-span-2"
-            />
-            <input
-              name="addressLine2"
-              defaultValue={profile?.addressLine2 ?? ""}
-              placeholder="住所2"
-              className="min-h-12 rounded-[20px] border border-slate-200 bg-slate-50 px-4 sm:col-span-2"
-            />
+            <label className="min-w-0 space-y-1.5 text-sm lg:col-span-3">
+              <span className="font-medium text-slate-700">住所</span>
+              <input
+                name="addressLine1"
+                defaultValue={[profile?.addressLine1, profile?.addressLine2]
+                  .filter(Boolean)
+                  .join(" ")}
+                placeholder="例：北海道札幌市中央区〇条〇丁目〇-〇"
+                className="min-h-12 w-full min-w-0 rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+              />
+            </label>
+            <input type="hidden" name="prefectureCode" value="" />
+            <input type="hidden" name="addressLine2" value="" />
           </div>
 
           <SubmitButton

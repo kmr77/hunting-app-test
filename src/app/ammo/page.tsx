@@ -80,7 +80,7 @@ export default async function AmmoPage({
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[0.92fr,1.08fr]">
+      <section className="grid gap-4">
         <form
           action={upsertAmmoAction}
           className="rounded-[30px] border border-emerald-950/10 bg-white/92 p-5 shadow-[0_24px_50px_-36px_rgba(15,23,42,0.38)]"
@@ -92,8 +92,18 @@ export default async function AmmoPage({
             <h3 className="mt-1 text-lg font-semibold">帳簿に記録を追加</h3>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1.5 text-sm">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+            <label className="min-w-0 space-y-1.5 text-sm">
+              <span className="font-medium text-slate-700">取引日</span>
+              <input
+                type="date"
+                name="transactionDate"
+                required
+                className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+              />
+            </label>
+
+            <label className="min-w-0 space-y-1.5 text-sm">
               <span className="font-medium text-slate-700">記録区分</span>
               <select
                 name="recordType"
@@ -108,7 +118,7 @@ export default async function AmmoPage({
               </select>
             </label>
 
-            <label className="space-y-1.5 text-sm">
+            <label className="min-w-0 space-y-1.5 text-sm">
               <span className="font-medium text-slate-700">実包種別</span>
               <select
                 name="ammoCategory"
@@ -123,16 +133,7 @@ export default async function AmmoPage({
               </select>
             </label>
 
-            <label className="space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">口径</span>
-              <input
-                name="caliber"
-                placeholder="例: 12番"
-                className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
-              />
-            </label>
-
-            <label className="space-y-1.5 text-sm">
+            <label className="min-w-0 space-y-1.5 text-sm">
               <span className="font-medium text-slate-700">数量</span>
               <input
                 type="number"
@@ -144,17 +145,16 @@ export default async function AmmoPage({
               />
             </label>
 
-            <label className="space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">取引日</span>
+            <label className="min-w-0 space-y-1.5 text-sm">
+              <span className="font-medium text-slate-700">口径</span>
               <input
-                type="date"
-                name="transactionDate"
-                required
+                name="caliber"
+                placeholder="例: 12番"
                 className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
               />
             </label>
 
-            <label className="space-y-1.5 text-sm">
+            <label className="min-w-0 space-y-1.5 text-sm lg:col-span-2">
               <span className="font-medium text-slate-700">仕入先</span>
               <input
                 name="supplierName"
@@ -163,7 +163,7 @@ export default async function AmmoPage({
               />
             </label>
 
-            <label className="space-y-1.5 text-sm sm:col-span-2">
+            <label className="min-w-0 space-y-1.5 text-sm">
               <span className="font-medium text-slate-700">伝票番号</span>
               <input
                 name="slipNumber"
@@ -172,7 +172,7 @@ export default async function AmmoPage({
               />
             </label>
 
-            <label className="space-y-1.5 text-sm sm:col-span-2">
+            <label className="min-w-0 space-y-1.5 text-sm lg:col-span-4">
               <span className="font-medium text-slate-700">メモ</span>
               <textarea
                 name="memo"
@@ -221,11 +221,18 @@ export default async function AmmoPage({
                     </span>
                   </div>
 
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+                    <input
+                      type="date"
+                      name="transactionDate"
+                      required
+                      defaultValue={formatDateInput(record.transactionDate)}
+                      className="min-h-12 min-w-0 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
+                    />
                     <select
                       name="recordType"
                       defaultValue={record.recordType}
-                      className="min-h-12 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
+                      className="min-h-12 min-w-0 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
                     >
                       {ammoRecordTypeOptions.map((option) => (
                         <option key={option} value={option}>
@@ -236,7 +243,7 @@ export default async function AmmoPage({
                     <select
                       name="ammoCategory"
                       defaultValue={record.ammoCategory}
-                      className="min-h-12 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
+                      className="min-h-12 min-w-0 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
                     >
                       {ammoCategoryOptions.map((option) => (
                         <option key={option} value={option}>
@@ -245,47 +252,39 @@ export default async function AmmoPage({
                       ))}
                     </select>
                     <input
-                      name="caliber"
-                      defaultValue={record.caliber ?? ""}
-                      placeholder="口径"
-                      className="min-h-12 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
-                    />
-                    <input
                       type="number"
                       min={1}
                       required
                       name="quantity"
                       defaultValue={record.quantity}
-                      className="min-h-12 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
+                      className="min-h-12 min-w-0 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
                     />
                     <input
-                      type="date"
-                      name="transactionDate"
-                      required
-                      defaultValue={formatDateInput(record.transactionDate)}
-                      className="min-h-12 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
+                      name="caliber"
+                      defaultValue={record.caliber ?? ""}
+                      placeholder="口径"
+                      className="min-h-12 min-w-0 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
                     />
                     <input
                       name="supplierName"
                       defaultValue={record.supplierName ?? ""}
                       placeholder="仕入先"
-                      className="min-h-12 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
+                      className="min-h-12 min-w-0 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm lg:col-span-2"
                     />
                     <input
                       name="slipNumber"
                       defaultValue={record.slipNumber ?? ""}
                       placeholder="伝票番号"
-                      className="min-h-12 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm sm:col-span-2"
+                      className="min-h-12 min-w-0 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
+                    />
+                    <textarea
+                      name="memo"
+                      rows={2}
+                      defaultValue={record.memo ?? ""}
+                      placeholder="メモ"
+                      className="min-w-0 rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm lg:col-span-4"
                     />
                   </div>
-
-                  <textarea
-                    name="memo"
-                    rows={2}
-                    defaultValue={record.memo ?? ""}
-                    placeholder="メモ"
-                    className="w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
-                  />
 
                   <SubmitButton pendingChildren="更新中...">
                     内容を更新

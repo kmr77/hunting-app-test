@@ -42,6 +42,13 @@ enum FirearmType {
   OTHER
 }
 
+enum FirearmBarrelType {
+  RIFLED
+  HALF_RIFLED
+  SMOOTHBORE
+  OTHER
+}
+
 enum FirearmStatus {
   ACTIVE
   DISPOSED
@@ -206,6 +213,13 @@ model RenewalRecord {
   issuedOn          DateTime?
   expiresOn         DateTime?
   reminderStartOn   DateTime?
+  originalPermittedOn DateTime?
+  originalPermitNumber String?
+  permitNumber      String?
+  confirmedOn       DateTime?
+  applicationStartOn DateTime?
+  applicationEndOn  DateTime?
+  validityDescription String?
   status            RenewalStatus   @default(ACTIVE)
   notes             String?
   createdAt         DateTime        @default(now())
@@ -233,30 +247,68 @@ model RenewalRecord {
 model FirearmRecord {
   id              String        @id @default(cuid())
   renewalRecordId String
+  displayName     String        @default("")
   firearmType     FirearmType
   manufacturer    String?
   modelName       String?
   serialNumber    String
   caliber         String?
   purposeCode     String?
+  purposeText     String?
+  permittedOn     DateTime?
+  expiresOn       DateTime?
+  totalLength     String?
+  barrelLength    String?
+  riflingRate     String?
+  magazineSpec    String?
+  compatibleAmmo  String?
+  features        String?
   acquiredOn      DateTime?
   disposedOn      DateTime?
   status          FirearmStatus @default(ACTIVE)
+  notes           String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   deletedAt       DateTime?
 
-  renewalRecord RenewalRecord @relation(fields: [renewalRecordId], references: [id], onDelete: Restrict)
+  renewalRecord  RenewalRecord         @relation(fields: [renewalRecordId], references: [id], onDelete: Restrict)
+  barrelRecords  FirearmBarrelRecord[]
 
   @@index([renewalRecordId])
   @@index([firearmType])
   @@index([serialNumber])
   @@index([status])
+  @@index([expiresOn])
   @@index([disposedOn])
   @@index([deletedAt])
   @@index([renewalRecordId, deletedAt])
   @@index([firearmType, status, deletedAt])
   @@map("firearm_records")
+}
+
+model FirearmBarrelRecord {
+  id              String            @id @default(cuid())
+  firearmRecordId String
+  barrelType      FirearmBarrelType
+  firearmKind     String?
+  barrelLength    String?
+  caliber         String?
+  riflingRate     String?
+  compatibleAmmo  String?
+  features        String?
+  purposeMemo     String?
+  notes           String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deletedAt       DateTime?
+
+  firearmRecord FirearmRecord @relation(fields: [firearmRecordId], references: [id], onDelete: Restrict)
+
+  @@index([firearmRecordId])
+  @@index([barrelType])
+  @@index([deletedAt])
+  @@index([firearmRecordId, deletedAt])
+  @@map("firearm_barrel_records")
 }
 
 model FileRecord {
