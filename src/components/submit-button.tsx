@@ -6,6 +6,7 @@ import { useFormStatus } from "react-dom";
 type SubmitButtonProps = {
   children: ReactNode;
   pendingChildren?: ReactNode;
+  pending?: boolean;
   variant?: "primary" | "secondary" | "danger";
   className?: string;
 } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type">;
@@ -22,13 +23,15 @@ const variantClasses = {
 export function SubmitButton({
   children,
   pendingChildren,
+  pending,
   variant = "primary",
   className = "",
   disabled,
   ...props
 }: SubmitButtonProps) {
-  const { pending } = useFormStatus();
-  const isDisabled = disabled || pending;
+  const { pending: formPending } = useFormStatus();
+  const isPending = pending || formPending;
+  const isDisabled = disabled || isPending;
 
   return (
     <button
@@ -38,7 +41,7 @@ export function SubmitButton({
       className={`inline-flex min-h-11 items-center justify-center rounded-full px-4 text-sm font-semibold transition-colors disabled:cursor-not-allowed ${variantClasses[variant]} ${className}`}
       {...props}
     >
-      {pending ? pendingChildren ?? "送信中..." : children}
+      {isPending ? pendingChildren ?? "送信中..." : children}
     </button>
   );
 }

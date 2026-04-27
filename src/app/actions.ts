@@ -24,6 +24,11 @@ import { redirect } from "next/navigation";
 import { ensureDemoUser } from "@/lib/app-data";
 import { withPrismaRetry } from "@/lib/prisma";
 
+export type FieldErrors = Record<string, string>;
+export type RenewalActionResult =
+  | { success: true }
+  | { success: false; errors?: FieldErrors; message?: string };
+
 const PERMIT_IMAGE_UPLOAD_DIR = path.join(
   process.cwd(),
   "public",
@@ -273,14 +278,24 @@ async function requireHuntingEvent(id: string, userId: string) {
   return event;
 }
 
-export async function upsertRenewalAction(formData: FormData) {
-  const pathname = "/renewals";
+export async function upsertRenewalAction(
+  formData: FormData,
+): Promise<RenewalActionResult> {
   const id = getOptionalString(formData, "id");
   const category = getString(formData, "category") as RenewalCategory;
   const expiresOn = getOptionalDate(formData, "expiresOn");
 
+  const errors: FieldErrors = {};
+  if (!category) {
+    errors.category = "種別を選択してください。";
+  }
+
   if (!isValidDate(expiresOn)) {
-    redirectWithMessage(pathname, "error", "有効期限日を入力してください。");
+    errors.expiresOn = "有効期限日を入力してください。";
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return { success: false, errors };
   }
 
   const targetDate = expiresOn;
@@ -363,19 +378,17 @@ export async function upsertRenewalAction(formData: FormData) {
       }
     }
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "更新記録の保存に失敗しました。";
-    redirectWithMessage(pathname, "error", message);
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "更新記録の保存に失敗しました。",
+    };
   }
 
   revalidateAppPaths("/", "/renewals", "/account");
-  redirectWithMessage(
-    pathname,
-    "success",
-    id ? "更新記録を更新しました。" : "更新記録を登録しました。",
-  );
+  return { success: true };
 }
 
 export async function deleteRenewalAction(formData: FormData) {

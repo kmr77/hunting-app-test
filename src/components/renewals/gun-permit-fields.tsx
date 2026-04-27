@@ -1,3 +1,5 @@
+"use client";
+
 type GunPermitFieldsProps = {
   defaultOriginalPermittedOn?: string;
   defaultOriginalPermitNumber?: string | null;

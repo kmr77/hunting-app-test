@@ -121,6 +121,15 @@
 - `nodebrew exec v20.20.2 -- npm run build` 成功。
 - ソース上で旧文言「更新対象を追加」「更新対象を保存」「原許可番号」「許可番号」単独ラベルが残っていないことを確認。
 
+## 2026-04-27
+
+### Changed
+- `/renewals` の免許・許可情報追加フォームを `RenewalCreateForm` として client component に切り出し、`upsertRenewalAction` の field 単位エラー表示を追加。
+- `src/app/actions.ts` の `upsertRenewalAction` を field error オブジェクトを返す形式に変更し、クライアント側で入力欄直下にエラーメッセージを表示できるようにした。
+- `src/components/field-error.tsx` を追加し、該当入力欄の下に日本語エラーメッセージを表示する仕組みを導入。
+- `src/components/submit-button.tsx` に `pending` prop を追加し、手動送信時でも送信中状態を反映できるようにした。
+- `src/components/renewals/gun-permit-fields.tsx` をクライアントコンポーネント化し、新規登録フォームでの再利用を可能にした。
+
 ## 2026-04-25
 
 ### Added
