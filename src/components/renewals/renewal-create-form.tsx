@@ -10,6 +10,7 @@ import { FirearmBarrelFields } from "@/components/renewals/firearm-barrel-fields
 import { RenewalFactFields } from "@/components/renewals/renewal-fact-fields";
 import { GunPermitFields } from "@/components/renewals/gun-permit-fields";
 import { upsertRenewalAction, type FieldErrors } from "@/app/actions";
+import type { RenewalRuleConfig } from "@/lib/validation-rules";
 import { firearmStatusLabels, firearmTypeLabels } from "@/lib/labels";
 
 const firearmTypeOptions = [
@@ -21,7 +22,14 @@ const firearmTypeOptions = [
 
 const firearmStatusOptions = ["ACTIVE", "DISPOSED", "INACTIVE"] as const;
 
-export function RenewalCreateForm() {
+export function RenewalCreateForm({
+  renewalRuleConfigs,
+}: {
+  renewalRuleConfigs: Record<
+    "HUNTING_LICENSE" | "GUN_LICENSE",
+    RenewalRuleConfig
+  >;
+}) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -79,7 +87,11 @@ export function RenewalCreateForm() {
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
         <input type="hidden" name="jurisdictionCode" value="" />
 
-        <RenewalFactFields gunPermitFields={<GunPermitFields />} gunFields={<GunFields errors={fieldErrors} />} />
+        <RenewalFactFields
+          renewalRuleConfigs={renewalRuleConfigs}
+          gunPermitFields={<GunPermitFields />}
+          gunFields={<GunFields errors={fieldErrors} />}
+        />
 
         <label className="min-w-0 space-y-1.5 text-sm lg:col-span-4">
           <span className="font-medium text-slate-700">メモ</span>

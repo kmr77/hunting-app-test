@@ -23,6 +23,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ensureDemoUser } from "@/lib/app-data";
 import { withPrismaRetry } from "@/lib/prisma";
+import { resolveRenewalRule } from "@/lib/validation-rules";
 import {
   normalizeCaliber,
   normalizeGeneralText,
@@ -47,7 +48,6 @@ const PERMIT_IMAGE_UPLOAD_DIR = path.join(
 const PERMIT_IMAGE_PUBLIC_DIR = "/uploads/renewal-permits";
 const PERMIT_IMAGE_MAX_BYTES = 1_600_000;
 const PERMIT_IMAGE_MIME_TYPE = "image/webp";
-const RENEWAL_REMINDER_LEAD_DAYS = 90;
 
 function getString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -308,9 +308,10 @@ export async function upsertRenewalAction(
     return { success: false, errors };
   }
 
+  const renewalRuleConfig = await resolveRenewalRule("COMMON", category);
   const targetDate = expiresOn;
   const reminderStartOn = targetDate
-    ? subtractDays(targetDate, RENEWAL_REMINDER_LEAD_DAYS)
+    ? subtractDays(targetDate, renewalRuleConfig.reminderLeadDays)
     : null;
 
   const payload = {
@@ -481,8 +482,9 @@ export async function updateRenewalPermitInfoAction(
     const user = await ensureDemoUser();
     const renewal = await requireRenewalRecord(id, user.id);
     const category = renewal.category;
+    const renewalRuleConfig = await resolveRenewalRule("COMMON", category);
     const reminderStartOn = expiresOn
-      ? subtractDays(expiresOn, RENEWAL_REMINDER_LEAD_DAYS)
+      ? subtractDays(expiresOn, renewalRuleConfig.reminderLeadDays)
       : null;
 
     await withPrismaRetry((prisma) =>

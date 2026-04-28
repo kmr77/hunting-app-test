@@ -12,6 +12,7 @@ import {
   RenewalStatus,
   UserStatus,
 } from "@prisma/client";
+import { DEFAULT_RENEWAL_RULE_CONFIG, resolveRenewalRule, type RenewalRuleConfig } from "@/lib/validation-rules";
 import { withPrismaRetry } from "@/lib/prisma";
 
 const DEMO_EMAIL = "demo@local.hunting-app";
@@ -111,6 +112,10 @@ export function getDashboardSummaryFallback() {
 export function getRenewalPageDataFallback() {
   return {
     renewals: [],
+    renewalRuleConfigs: {
+      HUNTING_LICENSE: DEFAULT_RENEWAL_RULE_CONFIG,
+      GUN_LICENSE: DEFAULT_RENEWAL_RULE_CONFIG,
+    } as Record<RenewalCategory, RenewalRuleConfig>,
   };
 }
 
@@ -209,48 +214,57 @@ export async function getDashboardSummary() {
 export async function getRenewalPageData() {
   const user = await ensureDemoUser();
 
-  const renewals = await withPrismaRetry((prisma) =>
-    prisma.renewalRecord.findMany({
-      where: {
-        userId: user.id,
-        deletedAt: null,
-      },
-      include: {
-        fileRecords: {
-          where: {
-            deletedAt: null,
-          },
-          select: {
-            id: true,
-            fileCategory: true,
-            storageKey: true,
-            originalFileName: true,
-            mimeType: true,
-            fileSize: true,
-            uploadedAt: true,
-          },
-          orderBy: { uploadedAt: "desc" },
+  const [renewalRuleConfigs, renewals] = await Promise.all([
+    Promise.all([
+      resolveRenewalRule("COMMON", RenewalCategory.HUNTING_LICENSE),
+      resolveRenewalRule("COMMON", RenewalCategory.GUN_LICENSE),
+    ]).then(([huntingConfig, gunConfig]) => ({
+      HUNTING_LICENSE: huntingConfig,
+      GUN_LICENSE: gunConfig,
+    } as Record<RenewalCategory, RenewalRuleConfig>)),
+    withPrismaRetry((prisma) =>
+      prisma.renewalRecord.findMany({
+        where: {
+          userId: user.id,
+          deletedAt: null,
         },
-        firearmRecords: {
-          where: {
-            deletedAt: null,
-          },
-          include: {
-            barrelRecords: {
-              where: {
-                deletedAt: null,
-              },
-              orderBy: { createdAt: "asc" },
+        include: {
+          fileRecords: {
+            where: {
+              deletedAt: null,
             },
+            select: {
+              id: true,
+              fileCategory: true,
+              storageKey: true,
+              originalFileName: true,
+              mimeType: true,
+              fileSize: true,
+              uploadedAt: true,
+            },
+            orderBy: { uploadedAt: "desc" },
           },
-          orderBy: { createdAt: "asc" },
+          firearmRecords: {
+            where: {
+              deletedAt: null,
+            },
+            include: {
+              barrelRecords: {
+                where: {
+                  deletedAt: null,
+                },
+                orderBy: { createdAt: "asc" },
+              },
+            },
+            orderBy: { createdAt: "asc" },
+          },
         },
-      },
-      orderBy: [{ expiresOn: "asc" }, { createdAt: "desc" }],
-    }),
-  );
+        orderBy: [{ expiresOn: "asc" }, { createdAt: "desc" }],
+      }),
+    ),
+  ]);
 
-  return { user, renewals };
+  return { user, renewals, renewalRuleConfigs };
 }
 
 export async function getAmmoPageData() {

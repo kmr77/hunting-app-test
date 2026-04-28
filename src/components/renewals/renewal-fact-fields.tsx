@@ -3,6 +3,7 @@
 import { DateInput } from "@/components/date-input";
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import type { RenewalRuleConfig } from "@/lib/validation-rules";
 
 type RenewalCategoryValue = "HUNTING_LICENSE" | "GUN_LICENSE";
 type RenewalStatusValue = "ACTIVE" | "EXPIRED" | "RENEWED" | "ARCHIVED";
@@ -12,11 +13,10 @@ type RenewalFactFieldsProps = {
   defaultStatus?: string;
   defaultIssuedOn?: string;
   defaultExpiresOn?: string;
+  renewalRuleConfigs: Record<RenewalCategoryValue, RenewalRuleConfig>;
   gunPermitFields?: ReactNode;
   gunFields?: ReactNode;
 };
-
-const REMINDER_LEAD_DAYS = 90;
 
 const categoryOptions: Array<{ value: RenewalCategoryValue; label: string }> = [
   { value: "HUNTING_LICENSE", label: "狩猟免許" },
@@ -95,7 +95,7 @@ function normalizeStatus(value: string): RenewalStatusValue {
     : "ACTIVE";
 }
 
-function getNextAction(daysUntil: number | null) {
+function getNextAction(daysUntil: number | null, reminderLeadDays: number) {
   if (daysUntil === null) {
     return "交付日または有効期限日を入力すると、次にやることを表示します。";
   }
@@ -104,7 +104,7 @@ function getNextAction(daysUntil: number | null) {
     return "期限を過ぎています。証明書の状態を確認してください。";
   }
 
-  if (daysUntil <= REMINDER_LEAD_DAYS) {
+  if (daysUntil <= reminderLeadDays) {
     return "更新手続きの準備を始める時期です。必要書類と窓口を確認してください。";
   }
 
@@ -116,6 +116,7 @@ export function RenewalFactFields({
   defaultStatus = "ACTIVE",
   defaultIssuedOn = "",
   defaultExpiresOn = "",
+  renewalRuleConfigs,
   gunPermitFields,
   gunFields,
 }: RenewalFactFieldsProps) {
@@ -125,8 +126,12 @@ export function RenewalFactFields({
   const [issuedOn, setIssuedOn] = useState(defaultIssuedOn);
   const [expiresOn, setExpiresOn] = useState(defaultExpiresOn);
 
+  const ruleConfig = renewalRuleConfigs[category];
+  const reminderLeadDays = ruleConfig.reminderLeadDays;
+  const reminderLeadDaysHelp = ruleConfig.reminderLeadDaysHelp;
+
   const targetDate = expiresOn || issuedOn;
-  const reminderStartOn = subtractDays(targetDate, REMINDER_LEAD_DAYS);
+  const reminderStartOn = subtractDays(targetDate, reminderLeadDays);
   const daysUntil = diffDaysFromToday(targetDate);
 
   const autoItems = useMemo(
@@ -144,7 +149,7 @@ export function RenewalFactFields({
       {
         label: "通知開始目安",
         value: formatDateLabel(reminderStartOn),
-        help: `${REMINDER_LEAD_DAYS}日前から注意表示する想定です。`,
+        help: reminderLeadDaysHelp,
       },
       {
         label: "期限までの日数",
@@ -238,7 +243,7 @@ export function RenewalFactFields({
           <div className="min-w-0 rounded-[18px] border border-emerald-950/10 bg-white px-4 py-3 lg:col-span-4">
             <p className="text-xs font-semibold text-slate-500">次にやること</p>
             <p className="mt-1 text-sm font-semibold leading-6 text-slate-950">
-              {getNextAction(daysUntil)}
+              {getNextAction(daysUntil, reminderLeadDays)}
             </p>
           </div>
         </div>

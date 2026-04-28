@@ -42,9 +42,13 @@ export default async function RenewalsPage({
     getRenewalPageDataFallback().renewals as Awaited<
       ReturnType<typeof getRenewalPageData>
     >["renewals"];
+  let renewalRuleConfigs: Awaited<ReturnType<typeof getRenewalPageData>>["renewalRuleConfigs"] =
+    getRenewalPageDataFallback().renewalRuleConfigs as Awaited<
+      ReturnType<typeof getRenewalPageData>
+    >["renewalRuleConfigs"];
 
   try {
-    ({ renewals } = await getRenewalPageData());
+    ({ renewals, renewalRuleConfigs } = await getRenewalPageData());
   } catch (error) {
     feedback ??= {
       variant: "error",
@@ -97,7 +101,7 @@ export default async function RenewalsPage({
       </section>
 
       <section className="grid gap-4">
-        <RenewalCreateForm />
+        <RenewalCreateForm renewalRuleConfigs={renewalRuleConfigs} />
 
         <section className="grid gap-4">
           {renewals.length === 0 ? (
