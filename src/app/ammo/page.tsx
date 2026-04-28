@@ -1,5 +1,6 @@
 import { deleteAmmoAction, upsertAmmoAction } from "@/app/actions";
 import { FeedbackBanner } from "@/components/feedback-banner";
+import { DateInput } from "@/components/date-input";
 import { SubmitButton } from "@/components/submit-button";
 import {
   ammoCategoryOptions,
@@ -95,8 +96,7 @@ export default async function AmmoPage({
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
             <label className="min-w-0 space-y-1.5 text-sm">
               <span className="font-medium text-slate-700">取引日</span>
-              <input
-                type="date"
+              <DateInput
                 name="transactionDate"
                 required
                 className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
@@ -222,8 +222,7 @@ export default async function AmmoPage({
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
-                    <input
-                      type="date"
+                    <DateInput
                       name="transactionDate"
                       required
                       defaultValue={formatDateInput(record.transactionDate)}

@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useState } from "react";
 import {
   createFirearmBarrelRecordAction,
   deleteFirearmBarrelRecordAction,
+  deleteFirearmRecordAction,
   updateFirearmBarrelRecordAction,
   updateFirearmRecordAction,
   updateRenewalPermitInfoAction,
 } from "@/app/actions";
+import { DateInput } from "@/components/date-input";
 
 type Item = { label: string; value: string | null | undefined };
 type Barrel = {
@@ -111,6 +113,9 @@ function Note() {
 
 export function RenewalRecordCard({ renewal }: { renewal: Renewal }) {
   const [editing, setEditing] = useState<"permit" | "firearm" | string | null>(null);
+  const [permitState, permitAction] = useActionState(updateRenewalPermitInfoAction, null);
+  const [firearmState, firearmAction] = useActionState(updateFirearmRecordAction, null);
+  const [barrelState, barrelAction] = useActionState(updateFirearmBarrelRecordAction, null);
   const firearm = renewal.firearmRecords[0];
 
   return (
@@ -134,19 +139,29 @@ export function RenewalRecordCard({ renewal }: { renewal: Renewal }) {
           ) : null}
         </div>
         {editing === "permit" ? (
-          <form action={updateRenewalPermitInfoAction} className="grid gap-3">
+          <form action={permitAction} className="grid gap-3">
+            {permitState && !permitState.success && permitState.errors && (
+              <div className="rounded-[18px] border border-red-200 bg-red-50 p-3">
+                <p className="text-sm font-semibold text-red-800">入力エラーがあります</p>
+                <ul className="mt-2 list-disc list-inside text-sm text-red-700">
+                  {Object.entries(permitState.errors).map(([key, message]) => (
+                    <li key={key}>{message as string}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <input type="hidden" name="id" value={renewal.id} />
             <Note />
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
               <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">進捗</span><select name="status" defaultValue={renewal.status} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4"><option value="ACTIVE">管理中</option><option value="EXPIRED">要確認</option><option value="RENEWED">完了</option></select></label>
-              <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">交付日</span><input type="date" name="issuedOn" defaultValue={renewal.issuedOn} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
-              <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">有効期限日</span><input type="date" name="expiresOn" defaultValue={renewal.expiresOn} required className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
-              <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">原許可日</span><input type="date" name="originalPermittedOn" defaultValue={renewal.originalPermittedOn} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
+              <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">交付日</span><DateInput name="issuedOn" defaultValue={renewal.issuedOn} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
+              <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">有効期限日</span><DateInput name="expiresOn" defaultValue={renewal.expiresOn} required className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
+              <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">原許可日</span><DateInput name="originalPermittedOn" defaultValue={renewal.originalPermittedOn} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
               <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">最初の許可番号</span><input name="originalPermitNumber" defaultValue={renewal.originalPermitNumber ?? ""} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
               <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">今回の許可番号</span><input name="permitNumber" defaultValue={renewal.permitNumber ?? ""} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
-              <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">確認日</span><input type="date" name="confirmedOn" defaultValue={renewal.confirmedOn} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
-              <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">更新申請期間開始日</span><input type="date" name="applicationStartOn" defaultValue={renewal.applicationStartOn} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
-              <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">更新申請期間終了日</span><input type="date" name="applicationEndOn" defaultValue={renewal.applicationEndOn} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
+              <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">確認日</span><DateInput name="confirmedOn" defaultValue={renewal.confirmedOn} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
+              <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">更新申請期間開始日</span><DateInput name="applicationStartOn" defaultValue={renewal.applicationStartOn} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
+              <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">更新申請期間終了日</span><DateInput name="applicationEndOn" defaultValue={renewal.applicationEndOn} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
               <label className="space-y-1.5 text-sm lg:col-span-2"><span className="font-medium text-slate-700">有効期間</span><input name="validityDescription" defaultValue={renewal.validityDescription ?? ""} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
               <label className="space-y-1.5 text-sm lg:col-span-4"><span className="font-medium text-slate-700">メモ</span><textarea name="notes" rows={2} defaultValue={renewal.notes ?? ""} className="w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3" /></label>
             </div>
@@ -179,7 +194,7 @@ export function RenewalRecordCard({ renewal }: { renewal: Renewal }) {
             </div>
             {editing !== "firearm" ? <button type="button" onClick={() => setEditing("firearm")} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700">編集</button> : null}
           </div>
-          {editing === "firearm" ? <FirearmForm firearm={firearm} onCancel={() => setEditing(null)} /> : <FirearmView firearm={firearm} />}
+          {editing === "firearm" ? <FirearmForm firearm={firearm} onCancel={() => setEditing(null)} state={firearmState} action={firearmAction} /> : <FirearmView firearm={firearm} />}
           <div className="mt-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm font-semibold text-slate-900">
@@ -203,7 +218,7 @@ export function RenewalRecordCard({ renewal }: { renewal: Renewal }) {
                 />
               ) : null}
               {firearm.barrelRecords.map((barrel, index) => (
-                <BarrelCard key={barrel.id} barrel={barrel} index={index} editing={editing === barrel.id} onEdit={() => setEditing(barrel.id)} onCancel={() => setEditing(null)} />
+                <BarrelCard key={barrel.id} barrel={barrel} index={index} editing={editing === barrel.id} onEdit={() => setEditing(barrel.id)} onCancel={() => setEditing(null)} state={barrelState} action={barrelAction} />
               ))}
             </div>
           </div>
@@ -236,12 +251,23 @@ function FirearmView({ firearm }: { firearm: Firearm }) {
   );
 }
 
-function FirearmForm({ firearm, onCancel }: { firearm: Firearm; onCancel: () => void }) {
+function FirearmForm({ firearm, onCancel, state, action }: { firearm: Firearm; onCancel: () => void; state: any; action: any }) {
   return (
-    <form action={updateFirearmRecordAction} className="grid gap-3 rounded-[22px] border border-emerald-950/10 bg-white p-4">
-      <input type="hidden" name="id" value={firearm.id} />
-      <Note />
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+    <>
+      <form action={action} className="grid gap-3 rounded-[22px] border border-emerald-950/10 bg-white p-4">
+        {state && !state.success && state.errors && (
+          <div className="rounded-[18px] border border-red-200 bg-red-50 p-3">
+            <p className="text-sm font-semibold text-red-800">入力エラーがあります</p>
+            <ul className="mt-2 list-disc list-inside text-sm text-red-700">
+              {Object.entries(state.errors).map(([key, message]) => (
+                <li key={key}>{message as string}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <input type="hidden" name="id" value={firearm.id} />
+        <Note />
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
         {[
           ["銃の管理名", "firearmDisplayName", firearm.displayName],
           ["メーカー", "manufacturer", firearm.manufacturer],
@@ -256,16 +282,37 @@ function FirearmForm({ firearm, onCancel }: { firearm: Firearm; onCancel: () => 
           ["特徴", "firearmFeatures", firearm.features],
           ["用途", "firearmPurposeText", firearm.purposeText],
         ].map(([label, name, value]) => <label key={name} className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">{label}</span><input name={name ?? ""} defaultValue={value ?? ""} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>)}
+        <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">許可日</span><DateInput name="firearmPermittedOn" defaultValue={firearm.permittedOn ?? ""} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
+        <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">有効期限日</span><DateInput name="firearmExpiresOn" defaultValue={firearm.expiresOn ?? ""} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
         <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">銃種</span><select name="firearmType" defaultValue={firearm.firearmType} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4"><option value="RIFLE">ライフル銃</option><option value="SHOTGUN">散弾銃</option><option value="AIR_RIFLE">空気銃</option></select></label>
         <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">状態</span><select name="firearmStatus" defaultValue={firearm.status} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4"><option value="ACTIVE">使用中</option><option value="INACTIVE">休止中</option><option value="DISPOSED">処分済み</option></select></label>
         <label className="space-y-1.5 text-sm lg:col-span-4"><span className="font-medium text-slate-700">備考</span><textarea name="firearmNotes" rows={2} defaultValue={firearm.notes ?? ""} className="w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3" /></label>
       </div>
       <Actions onCancel={onCancel} />
     </form>
+    <form action={deleteFirearmRecordAction} className="mt-3 flex justify-end">
+      <input type="hidden" name="id" value={firearm.id} />
+      <button
+        type="submit"
+        onClick={(event) => {
+          if (
+            !confirm(
+              "この銃本体を削除すると、紐づく銃身情報もすべて削除されます。よろしいですか？",
+            )
+          ) {
+            event.preventDefault();
+          }
+        }}
+        className="min-h-11 rounded-full border border-slate-200 bg-white px-5 text-sm font-semibold text-red-700"
+      >
+        銃本体を削除
+      </button>
+    </form>
+  </>
   );
 }
 
-function BarrelCard({ barrel, index, editing, onEdit, onCancel }: { barrel: Barrel; index: number; editing: boolean; onEdit: () => void; onCancel: () => void }) {
+function BarrelCard({ barrel, index, editing, onEdit, onCancel, state, action }: { barrel: Barrel; index: number; editing: boolean; onEdit: () => void; onCancel: () => void; state: any; action: any }) {
   const items: Item[] = [
     { label: "種類", value: barrel.firearmKind },
     { label: "口径", value: barrel.caliber },
@@ -279,7 +326,17 @@ function BarrelCard({ barrel, index, editing, onEdit, onCancel }: { barrel: Barr
 
   if (editing) {
     return (
-      <form action={updateFirearmBarrelRecordAction} className="grid gap-3 rounded-[18px] border border-emerald-950/10 bg-white p-3">
+      <form action={action} className="grid gap-3 rounded-[18px] border border-emerald-950/10 bg-white p-3">
+        {state && !state.success && state.errors && (
+          <div className="rounded-[18px] border border-red-200 bg-red-50 p-3">
+            <p className="text-sm font-semibold text-red-800">入力エラーがあります</p>
+            <ul className="mt-2 list-disc list-inside text-sm text-red-700">
+              {Object.entries(state.errors).map(([key, message]) => (
+                <li key={key}>{message as string}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <input type="hidden" name="id" value={barrel.id} />
         <Note />
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">

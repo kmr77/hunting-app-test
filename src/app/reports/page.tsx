@@ -4,6 +4,7 @@ import {
   upsertHuntingEventAction,
 } from "@/app/actions";
 import { FeedbackBanner } from "@/components/feedback-banner";
+import { DateInput } from "@/components/date-input";
 import { ReportLocationFields } from "@/components/reports/report-location-fields";
 import { SubmitButton } from "@/components/submit-button";
 import {
@@ -113,8 +114,7 @@ export default async function ReportsPage({
           <div className="report-form-grid grid grid-cols-1 gap-3 lg:grid-cols-4">
             <label className="report-date-field min-w-0 space-y-1.5 text-sm">
               <span className="font-medium text-slate-700">実施日</span>
-              <input
-                type="date"
+              <DateInput
                 name="eventDate"
                 required
                 className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
@@ -277,8 +277,7 @@ export default async function ReportsPage({
                     </div>
 
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <input
-                        type="date"
+                      <DateInput
                         name="eventDate"
                         required
                         defaultValue={formatDateInput(event.eventDate)}

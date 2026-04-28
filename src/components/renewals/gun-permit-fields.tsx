@@ -1,5 +1,7 @@
 "use client";
 
+import { DateInput } from "@/components/date-input";
+
 type GunPermitFieldsProps = {
   defaultOriginalPermittedOn?: string;
   defaultOriginalPermitNumber?: string | null;
@@ -32,8 +34,7 @@ export function GunPermitFields({
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
         <label className="min-w-0 space-y-1.5 text-sm">
           <span className="font-medium text-slate-700">原許可日</span>
-          <input
-            type="date"
+          <DateInput
             name="originalPermittedOn"
             defaultValue={defaultOriginalPermittedOn}
             className="min-h-12 w-full min-w-0 rounded-[18px] border border-emerald-950/10 bg-slate-50 px-4"
@@ -70,8 +71,7 @@ export function GunPermitFields({
 
         <label className="min-w-0 space-y-1.5 text-sm">
           <span className="font-medium text-slate-700">確認日</span>
-          <input
-            type="date"
+          <DateInput
             name="confirmedOn"
             defaultValue={defaultConfirmedOn}
             className="min-h-12 w-full min-w-0 rounded-[18px] border border-emerald-950/10 bg-slate-50 px-4"
@@ -80,8 +80,7 @@ export function GunPermitFields({
 
         <label className="min-w-0 space-y-1.5 text-sm">
           <span className="font-medium text-slate-700">更新申請期間開始日</span>
-          <input
-            type="date"
+          <DateInput
             name="applicationStartOn"
             defaultValue={defaultApplicationStartOn}
             className="min-h-12 w-full min-w-0 rounded-[18px] border border-emerald-950/10 bg-slate-50 px-4"
@@ -90,8 +89,7 @@ export function GunPermitFields({
 
         <label className="min-w-0 space-y-1.5 text-sm">
           <span className="font-medium text-slate-700">更新申請期間終了日</span>
-          <input
-            type="date"
+          <DateInput
             name="applicationEndOn"
             defaultValue={defaultApplicationEndOn}
             className="min-h-12 w-full min-w-0 rounded-[18px] border border-emerald-950/10 bg-slate-50 px-4"

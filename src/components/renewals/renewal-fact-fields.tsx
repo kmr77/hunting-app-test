@@ -1,5 +1,6 @@
 "use client";
 
+import { DateInput } from "@/components/date-input";
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
@@ -189,8 +190,7 @@ export function RenewalFactFields({
 
       <label className="min-w-0 space-y-1.5 text-sm">
         <span className="font-medium text-slate-700">交付日</span>
-        <input
-          type="date"
+        <DateInput
           name="issuedOn"
           value={issuedOn}
           onChange={(event) => setIssuedOn(event.target.value)}
@@ -203,8 +203,7 @@ export function RenewalFactFields({
 
       <label className="min-w-0 space-y-1.5 text-sm">
         <span className="font-medium text-slate-700">有効期限日</span>
-        <input
-          type="date"
+        <DateInput
           name="expiresOn"
           required
           value={expiresOn}

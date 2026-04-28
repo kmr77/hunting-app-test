@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
+import { DateInput } from "@/components/date-input";
 import { FieldError } from "@/components/field-error";
 import { SubmitButton } from "@/components/submit-button";
 import { FirearmBarrelFields } from "@/components/renewals/firearm-barrel-fields";
@@ -263,20 +264,14 @@ function GunFields({ errors }: { errors: FieldErrors }) {
 
         <label className="min-w-0 space-y-1.5 text-sm">
           <span className="font-medium text-slate-700">許可日</span>
-          <input
-            type="date"
-            name="firearmPermittedOn"
-            className={`min-h-12 w-full min-w-0 rounded-[18px] px-4 ${errors.firearmPermittedOn ? "border-red-500" : "border-emerald-950/10"} bg-white`}
+              <DateInput
           />
           <FieldError error={errors.firearmPermittedOn} />
         </label>
 
         <label className="min-w-0 space-y-1.5 text-sm">
           <span className="font-medium text-slate-700">有効期限日</span>
-          <input
-            type="date"
-            name="firearmExpiresOn"
-            className={`min-h-12 w-full min-w-0 rounded-[18px] px-4 ${errors.firearmExpiresOn ? "border-red-500" : "border-emerald-950/10"} bg-white`}
+              <DateInput
           />
           <FieldError error={errors.firearmExpiresOn} />
         </label>

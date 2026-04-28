@@ -1,5 +1,6 @@
 import { updateAccountAction } from "@/app/actions";
 import { FeedbackBanner } from "@/components/feedback-banner";
+import { DateInput } from "@/components/date-input";
 import { SubmitButton } from "@/components/submit-button";
 import {
   getDataLoadErrorMessage,
@@ -125,8 +126,7 @@ export default async function AccountPage({
 
             <label className="min-w-0 space-y-1.5 text-sm">
               <span className="font-medium text-slate-700">生年月日</span>
-              <input
-                type="date"
+              <DateInput
                 name="birthDate"
                 defaultValue={formatDateInput(profile?.birthDate)}
                 className="min-h-12 w-full min-w-0 rounded-[20px] border border-slate-200 bg-slate-50 px-4"
