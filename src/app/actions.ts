@@ -407,7 +407,7 @@ export async function deleteRenewalAction(formData: FormData) {
   const id = getString(formData, "id");
 
   if (!id) {
-    redirectWithMessage(pathname, "error", "削除対象が見つかりません。");
+    redirectWithMessage(pathname, "error", "削除に失敗しました。");
   }
 
   try {
@@ -441,7 +441,7 @@ export async function deleteRenewalAction(formData: FormData) {
   }
 
   revalidateAppPaths("/", "/renewals", "/account");
-  redirectWithMessage(pathname, "success", "更新記録を削除しました。");
+  redirectWithMessage(pathname, "success", "削除しました。");
 }
 
 export async function updateRenewalPermitInfoAction(
@@ -454,7 +454,7 @@ export async function updateRenewalPermitInfoAction(
   const errors: FieldErrors = {};
 
   if (!id) {
-    redirectWithMessage(pathname, "error", "更新記録が見つかりません。");
+    redirectWithMessage(pathname, "error", "更新に失敗しました。");
   }
 
   if (!isValidDate(expiresOn)) {
@@ -532,7 +532,7 @@ export async function updateFirearmRecordAction(
   const errors: FieldErrors = {};
 
   if (!id) {
-    redirectWithMessage(pathname, "error", "所持銃情報が見つかりません。");
+    redirectWithMessage(pathname, "error", "更新に失敗しました。");
   }
 
   const serialNumberRaw = getOptionalString(formData, "serialNumber");
@@ -629,7 +629,7 @@ export async function updateFirearmBarrelRecordAction(
   const errors: FieldErrors = {};
 
   if (!id) {
-    redirectWithMessage(pathname, "error", "銃身情報が見つかりません。");
+    redirectWithMessage(pathname, "error", "更新に失敗しました。");
   }
 
   const barrelLengthRaw = getOptionalString(formData, "barrelLength");
@@ -708,7 +708,7 @@ export async function createFirearmBarrelRecordAction(formData: FormData) {
   const firearmRecordId = getString(formData, "firearmRecordId");
 
   if (!firearmRecordId) {
-    redirectWithMessage(pathname, "error", "所持銃情報が見つかりません。");
+    redirectWithMessage(pathname, "error", "更新に失敗しました。");
   }
 
   try {
@@ -758,7 +758,7 @@ export async function createFirearmBarrelRecordAction(formData: FormData) {
   }
 
   revalidateAppPaths("/renewals");
-  redirectWithMessage(pathname, "success", "銃身情報を追加しました。");
+  redirectWithMessage(pathname, "success", "追加しました。");
 }
 
 export async function deleteFirearmBarrelRecordAction(formData: FormData) {
@@ -766,7 +766,7 @@ export async function deleteFirearmBarrelRecordAction(formData: FormData) {
   const id = getString(formData, "id");
 
   if (!id) {
-    redirectWithMessage(pathname, "error", "銃身情報が見つかりません。");
+    redirectWithMessage(pathname, "error", "更新に失敗しました。");
   }
 
   try {
@@ -807,7 +807,7 @@ export async function deleteFirearmBarrelRecordAction(formData: FormData) {
   }
 
   revalidateAppPaths("/renewals");
-  redirectWithMessage(pathname, "success", "銃身情報を削除しました。");
+  redirectWithMessage(pathname, "success", "削除しました。");
 }
 
 export async function deleteFirearmRecordAction(formData: FormData) {
@@ -815,7 +815,7 @@ export async function deleteFirearmRecordAction(formData: FormData) {
   const id = getString(formData, "id");
 
   if (!id) {
-    redirectWithMessage(pathname, "error", "所持銃情報が見つかりません。");
+    redirectWithMessage(pathname, "error", "更新に失敗しました。");
   }
 
   try {
@@ -863,7 +863,7 @@ export async function deleteFirearmRecordAction(formData: FormData) {
   }
 
   revalidateAppPaths("/renewals");
-  redirectWithMessage(pathname, "success", "所持銃情報を削除しました。");
+  redirectWithMessage(pathname, "success", "削除しました。");
 }
 
 export async function uploadRenewalPermitImageAction(formData: FormData) {
@@ -871,7 +871,7 @@ export async function uploadRenewalPermitImageAction(formData: FormData) {
   const renewalRecordId = getString(formData, "renewalRecordId");
 
   if (!renewalRecordId) {
-    redirectWithMessage(pathname, "error", "更新記録が見つかりません。");
+    redirectWithMessage(pathname, "error", "更新に失敗しました。");
   }
 
   try {
@@ -947,7 +947,7 @@ export async function uploadRenewalPermitImageAction(formData: FormData) {
   }
 
   revalidateAppPaths("/", "/renewals", "/account");
-  redirectWithMessage(pathname, "success", "許可証画像を保存しました。");
+  redirectWithMessage(pathname, "success", "画像を登録しました。");
 }
 
 export async function deleteRenewalPermitImageAction(formData: FormData) {
@@ -956,7 +956,7 @@ export async function deleteRenewalPermitImageAction(formData: FormData) {
   const fileRecordId = getString(formData, "fileRecordId");
 
   if (!renewalRecordId || !fileRecordId) {
-    redirectWithMessage(pathname, "error", "削除対象の画像が見つかりません。");
+    redirectWithMessage(pathname, "error", "画像の削除に失敗しました。");
   }
 
   try {
@@ -1004,7 +1004,7 @@ export async function deleteRenewalPermitImageAction(formData: FormData) {
   }
 
   revalidateAppPaths("/", "/renewals", "/account");
-  redirectWithMessage(pathname, "success", "許可証画像を削除しました。");
+  redirectWithMessage(pathname, "success", "画像を削除しました。");
 }
 
 export async function upsertAmmoAction(formData: FormData) {
@@ -1014,11 +1014,11 @@ export async function upsertAmmoAction(formData: FormData) {
   const transactionDate = getOptionalDate(formData, "transactionDate");
 
   if (quantity <= 0) {
-    redirectWithMessage(pathname, "error", "数量は 1 以上で入力してください。");
+    redirectWithMessage(pathname, "error", "保存に失敗しました。");
   }
 
   if (!isValidDate(transactionDate)) {
-    redirectWithMessage(pathname, "error", "取引日を入力してください。");
+    redirectWithMessage(pathname, "error", "保存に失敗しました。");
   }
 
   const safeTransactionDate = transactionDate as Date;
@@ -1074,7 +1074,7 @@ export async function deleteAmmoAction(formData: FormData) {
   const id = getString(formData, "id");
 
   if (!id) {
-    redirectWithMessage(pathname, "error", "削除対象が見つかりません。");
+    redirectWithMessage(pathname, "error", "削除に失敗しました。");
   }
 
   try {
@@ -1094,7 +1094,7 @@ export async function deleteAmmoAction(formData: FormData) {
   }
 
   revalidateAppPaths("/", "/ammo", "/account");
-  redirectWithMessage(pathname, "success", "実包記録を削除しました。");
+  redirectWithMessage(pathname, "success", "削除しました。");
 }
 
 export async function upsertHuntingEventAction(formData: FormData) {
@@ -1108,21 +1108,21 @@ export async function upsertHuntingEventAction(formData: FormData) {
   const toolQuantity = toolQuantityValue ? getInt(formData, "toolQuantity") : null;
 
   if (!isValidDate(eventDate)) {
-    redirectWithMessage(pathname, "error", "実施日を入力してください。");
+    redirectWithMessage(pathname, "error", "保存に失敗しました。");
   }
 
   const safeEventDate = eventDate as Date;
 
   if (!targetSpecies) {
-    redirectWithMessage(pathname, "error", "対象鳥獣を入力してください。");
+    redirectWithMessage(pathname, "error", "保存に失敗しました。");
   }
 
   if (resultCount !== null && resultCount < 0) {
-    redirectWithMessage(pathname, "error", "成果数は 0 以上で入力してください。");
+    redirectWithMessage(pathname, "error", "保存に失敗しました。");
   }
 
   if (toolQuantity !== null && toolQuantity < 0) {
-    redirectWithMessage(pathname, "error", "道具数量は 0 以上で入力してください。");
+    redirectWithMessage(pathname, "error", "保存に失敗しました。");
   }
 
   const payload = {
@@ -1227,7 +1227,7 @@ export async function deleteHuntingEventAction(formData: FormData) {
   const id = getString(formData, "id");
 
   if (!id) {
-    redirectWithMessage(pathname, "error", "削除対象が見つかりません。");
+    redirectWithMessage(pathname, "error", "削除に失敗しました。");
   }
 
   try {
@@ -1254,7 +1254,7 @@ export async function deleteHuntingEventAction(formData: FormData) {
   }
 
   revalidateAppPaths("/", "/reports", "/account");
-  redirectWithMessage(pathname, "success", "狩猟記録を削除しました。");
+  redirectWithMessage(pathname, "success", "削除しました。");
 }
 
 export async function toggleImportedToReportAction(formData: FormData) {
@@ -1349,5 +1349,5 @@ export async function updateAccountAction(formData: FormData) {
   }
 
   revalidateAppPaths("/", "/account");
-  redirectWithMessage(pathname, "success", "アカウント情報を更新しました。");
+  redirectWithMessage(pathname, "success", "更新しました。");
 }

@@ -28,7 +28,7 @@ export function FeedbackBanner({ feedback }: FeedbackBannerProps) {
         <span
           className={`inline-flex min-h-8 items-center rounded-full px-3 text-xs font-semibold tracking-[0.16em] uppercase ${classes.label}`}
         >
-          {feedback.variant === "success" ? "完了" : "要確認"}
+          {feedback.variant === "success" ? "成功" : "失敗"}
         </span>
         <p className="pt-1 text-sm leading-7">{feedback.message}</p>
       </div>
