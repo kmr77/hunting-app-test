@@ -71,10 +71,10 @@ export default async function AmmoPage({
             </div>
             <div className="rounded-[24px] bg-slate-100 p-4">
               <p className="text-xs font-semibold tracking-[0.16em] text-slate-500 uppercase">
-                記録件数
+                帳簿記録
               </p>
               <p className="mt-2 text-3xl font-semibold text-slate-950">
-                {ammoRecords.length}
+                {ammoRecords.length} 件
               </p>
             </div>
           </div>
@@ -194,7 +194,7 @@ export default async function AmmoPage({
         <section className="grid gap-4">
           {ammoRecords.length === 0 ? (
             <div className="rounded-[30px] border border-dashed border-emerald-950/15 bg-white/72 p-6 text-sm leading-7 text-slate-600">
-              実包帳簿はまだ空です。最初の購入または消費記録を追加してください。
+              実包帳簿はまだ登録されていません。最初に現在の残弾数を繰越として登録すると、購入・消費の流れを管理しやすくなります。
             </div>
           ) : (
             ammoRecords.map((record) => (

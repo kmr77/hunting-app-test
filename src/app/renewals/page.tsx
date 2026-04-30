@@ -80,10 +80,10 @@ export default async function RenewalsPage({
           <div className="grid grid-cols-2 gap-3 sm:min-w-80">
             <div className="rounded-[24px] bg-emerald-50 p-4">
               <p className="text-xs font-semibold tracking-[0.16em] text-emerald-700 uppercase">
-                登録件数
+                登録済み
               </p>
               <p className="mt-2 text-2xl font-semibold text-emerald-950">
-                {renewals.length}
+                {renewals.length} 件
               </p>
             </div>
             <div className="rounded-[24px] bg-slate-100 p-4">
@@ -106,7 +106,7 @@ export default async function RenewalsPage({
         <section className="grid gap-4">
           {renewals.length === 0 ? (
             <div className="rounded-[30px] border border-dashed border-emerald-950/15 bg-white/72 p-6 text-sm leading-7 text-slate-600">
-              登録済みの更新対象はまだありません。左のフォームから最初の1件を追加してください。
+              免許・許可情報はまだ登録されていません。狩猟免許または銃砲所持許可の交付日・有効期限日を登録すると、更新予定日や通知開始目安を確認できます。
             </div>
           ) : (
             renewals.map((renewal) => {

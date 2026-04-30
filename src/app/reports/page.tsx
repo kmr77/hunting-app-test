@@ -89,10 +89,10 @@ export default async function ReportsPage({
             </div>
             <div className="rounded-[24px] bg-slate-100 p-4">
               <p className="text-xs font-semibold tracking-[0.16em] text-slate-500 uppercase">
-                記録件数
+                狩猟記録
               </p>
               <p className="mt-2 text-3xl font-semibold text-slate-950">
-                {huntingEvents.length}
+                {huntingEvents.length} 件
               </p>
             </div>
           </div>
@@ -241,7 +241,7 @@ export default async function ReportsPage({
         <section className="grid gap-4">
           {huntingEvents.length === 0 ? (
             <div className="rounded-[30px] border border-dashed border-emerald-950/15 bg-white/72 p-6 text-sm leading-7 text-slate-600">
-              狩猟記録はまだありません。最初の1件を登録して転記運用を始めてください。
+              狩猟記録はまだありません。出猟日・猟法・場所・対象鳥獣を登録すると、報告書への転記内容を確認できます。
             </div>
           ) : (
             huntingEvents.map((event) => {
