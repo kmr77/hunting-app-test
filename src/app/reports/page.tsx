@@ -6,6 +6,7 @@ import {
 import { FeedbackBanner } from "@/components/feedback-banner";
 import { DateInput } from "@/components/date-input";
 import { ReportLocationFields } from "@/components/reports/report-location-fields";
+import { formFieldBase, formFieldLabel, formLabelText, formTextareaBase, formFieldCompact, formTextareaCompact } from "@/lib/form-classes";
 import { SubmitButton } from "@/components/submit-button";
 import {
   getDataLoadErrorMessage,
@@ -112,21 +113,21 @@ export default async function ReportsPage({
           </div>
 
           <div className="report-form-grid grid grid-cols-1 gap-3 lg:grid-cols-4">
-            <label className="report-date-field min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">実施日</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>実施日</span>
               <DateInput
                 name="eventDate"
                 required
-                className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+                className={formFieldBase}
               />
             </label>
 
-            <label className="report-select-field min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">猟法</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>猟法</span>
               <select
                 name="huntingMethod"
                 defaultValue="GUN"
-                className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+                className={formFieldBase}
               >
                 {huntingMethodOptions.map((option) => (
                   <option key={option} value={option}>
@@ -136,12 +137,12 @@ export default async function ReportsPage({
               </select>
             </label>
 
-            <label className="report-select-field min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">目的</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>目的</span>
               <select
                 name="purposeCode"
                 defaultValue="HUNTING"
-                className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+                className={formFieldBase}
               >
                 {huntingPurposeOptions.map((option) => (
                   <option key={option} value={option}>
@@ -151,14 +152,14 @@ export default async function ReportsPage({
               </select>
             </label>
 
-            <label className="report-number-field min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">成果数</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>成果数</span>
               <input
                 type="number"
                 min={0}
                 name="resultCount"
                 defaultValue={0}
-                className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+                className={formFieldBase}
               />
             </label>
 
@@ -168,23 +169,23 @@ export default async function ReportsPage({
               }
             />
 
-            <label className="report-species-field min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">対象鳥獣</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>対象鳥獣</span>
               <input
                 name="targetSpecies"
                 required
                 placeholder="例: シカ"
-                className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+                className={formFieldBase}
               />
             </label>
 
-            <label className="report-memo-field min-w-0 space-y-1.5 text-sm lg:col-span-4">
-              <span className="font-medium text-slate-700">備考</span>
+            <label className={formFieldLabel + " lg:col-span-4"}>
+              <span className={formLabelText}>備考</span>
               <textarea
                 name="notes"
                 rows={3}
                 placeholder="報告書に残したい補足"
-                className="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3"
+                className={formTextareaBase}
               />
             </label>
           </div>
@@ -202,7 +203,7 @@ export default async function ReportsPage({
               <select
                 name="toolType"
                 defaultValue="FIREARM"
-                className="report-tool-type min-h-12 min-w-0 rounded-[18px] border border-emerald-950/10 bg-white px-4 text-sm"
+                className={formFieldCompact}
               >
                 {huntingToolTypeOptions.map((option) => (
                   <option key={option} value={option}>
@@ -213,19 +214,19 @@ export default async function ReportsPage({
               <input
                 name="toolName"
                 placeholder="例: 12番散弾銃"
-                className="report-tool-name min-h-12 min-w-0 rounded-[18px] border border-emerald-950/10 bg-white px-4 text-sm"
+                className={formFieldCompact}
               />
               <input
                 type="number"
                 min={0}
                 name="toolQuantity"
                 defaultValue={1}
-                className="report-tool-number min-h-12 min-w-0 rounded-[18px] border border-emerald-950/10 bg-white px-4 text-sm"
+                className={formFieldCompact}
               />
               <input
                 name="toolNotes"
                 placeholder="道具メモ"
-                className="report-tool-memo min-h-12 min-w-0 rounded-[18px] border border-emerald-950/10 bg-white px-4 text-sm lg:col-span-4"
+                className={formFieldCompact}
               />
             </div>
           </div>
@@ -281,12 +282,12 @@ export default async function ReportsPage({
                         name="eventDate"
                         required
                         defaultValue={formatDateInput(event.eventDate)}
-                        className="min-h-12 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
+                        className={formFieldCompact}
                       />
                       <select
                         name="huntingMethod"
                         defaultValue={event.huntingMethod ?? "GUN"}
-                        className="min-h-12 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
+                        className={formFieldCompact}
                       >
                         {huntingMethodOptions.map((option) => (
                           <option key={option} value={option}>
@@ -299,7 +300,7 @@ export default async function ReportsPage({
                         required
                         defaultValue={event.targetSpecies ?? ""}
                         placeholder="対象鳥獣"
-                        className="min-h-12 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
+                        className={formFieldCompact}
                       />
                       <ReportLocationFields
                         defaultPrefectureCode={event.prefectureCode}
@@ -311,7 +312,7 @@ export default async function ReportsPage({
                       <select
                         name="purposeCode"
                         defaultValue={event.purposeCode ?? "HUNTING"}
-                        className="min-h-12 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
+                        className={formFieldCompact}
                       >
                         {huntingPurposeOptions.map((option) => (
                           <option key={option} value={option}>
@@ -324,7 +325,7 @@ export default async function ReportsPage({
                         min={0}
                         name="resultCount"
                         defaultValue={event.resultCount ?? 0}
-                        className="min-h-12 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
+                        className={formFieldCompact}
                       />
                     </div>
 
@@ -348,7 +349,7 @@ export default async function ReportsPage({
                       <select
                         name="toolType"
                         defaultValue={primaryTool?.toolType ?? "FIREARM"}
-                        className="min-h-12 rounded-[18px] border border-emerald-950/10 bg-white px-4 text-sm"
+                        className={formFieldCompact}
                       >
                         {huntingToolTypeOptions.map((option) => (
                           <option key={option} value={option}>
@@ -360,20 +361,20 @@ export default async function ReportsPage({
                         name="toolName"
                         defaultValue={primaryTool?.toolName ?? ""}
                         placeholder="道具名"
-                        className="min-h-12 rounded-[18px] border border-emerald-950/10 bg-white px-4 text-sm"
+                        className={formFieldCompact}
                       />
                       <input
                         type="number"
                         min={0}
                         name="toolQuantity"
                         defaultValue={primaryTool?.quantity ?? 1}
-                        className="min-h-12 rounded-[18px] border border-emerald-950/10 bg-white px-4 text-sm"
+                        className={formFieldCompact}
                       />
                       <input
                         name="toolNotes"
                         defaultValue={primaryTool?.notes ?? ""}
                         placeholder="道具メモ"
-                        className="min-h-12 rounded-[18px] border border-emerald-950/10 bg-white px-4 text-sm"
+                        className={formFieldCompact}
                       />
                     </div>
 
@@ -382,7 +383,7 @@ export default async function ReportsPage({
                       rows={2}
                       defaultValue={event.notes ?? ""}
                       placeholder="備考"
-                      className="w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
+                      className={formTextareaCompact}
                     />
 
                     <SubmitButton pendingChildren="更新中...">

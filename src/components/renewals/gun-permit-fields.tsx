@@ -1,6 +1,7 @@
 "use client";
 
 import { DateInput } from "@/components/date-input";
+import { formFieldCompact, formFieldLabel, formLabelText } from "@/lib/form-classes";
 
 type GunPermitFieldsProps = {
   defaultOriginalPermittedOn?: string;
@@ -32,18 +33,18 @@ export function GunPermitFields({
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
-        <label className="min-w-0 space-y-1.5 text-sm">
-          <span className="font-medium text-slate-700">原許可日</span>
+        <label className={formFieldLabel}>
+          <span className={formLabelText}>原許可日</span>
           <DateInput
             name="originalPermittedOn"
             defaultValue={defaultOriginalPermittedOn}
-            className="min-h-12 w-full min-w-0 rounded-[18px] border border-emerald-950/10 bg-slate-50 px-4"
+            className={formFieldCompact}
           />
         </label>
 
-        <label className="min-w-0 space-y-1.5 text-sm">
-          <span className="font-medium text-slate-700">最初の許可番号</span>
-          <span className="flex min-w-0 items-center rounded-[18px] border border-emerald-950/10 bg-slate-50">
+        <label className={formFieldLabel}>
+          <span className={formLabelText}>最初の許可番号</span>
+          <span className="flex min-w-0 items-center rounded-[18px] border border-slate-200 bg-slate-50">
             <span className="pl-4 text-sm font-semibold text-slate-600">第</span>
             <input
               name="originalPermitNumber"
@@ -55,9 +56,9 @@ export function GunPermitFields({
           </span>
         </label>
 
-        <label className="min-w-0 space-y-1.5 text-sm">
-          <span className="font-medium text-slate-700">今回の許可番号</span>
-          <span className="flex min-w-0 items-center rounded-[18px] border border-emerald-950/10 bg-slate-50">
+        <label className={formFieldLabel}>
+          <span className={formLabelText}>今回の許可番号</span>
+          <span className="flex min-w-0 items-center rounded-[18px] border border-slate-200 bg-slate-50">
             <span className="pl-4 text-sm font-semibold text-slate-600">第</span>
             <input
               name="permitNumber"
@@ -69,40 +70,40 @@ export function GunPermitFields({
           </span>
         </label>
 
-        <label className="min-w-0 space-y-1.5 text-sm">
-          <span className="font-medium text-slate-700">確認日</span>
+        <label className={formFieldLabel}>
+          <span className={formLabelText}>確認日</span>
           <DateInput
             name="confirmedOn"
             defaultValue={defaultConfirmedOn}
-            className="min-h-12 w-full min-w-0 rounded-[18px] border border-emerald-950/10 bg-slate-50 px-4"
+            className={formFieldCompact}
           />
         </label>
 
-        <label className="min-w-0 space-y-1.5 text-sm">
-          <span className="font-medium text-slate-700">更新申請期間開始日</span>
+        <label className={formFieldLabel}>
+          <span className={formLabelText}>更新申請期間開始日</span>
           <DateInput
             name="applicationStartOn"
             defaultValue={defaultApplicationStartOn}
-            className="min-h-12 w-full min-w-0 rounded-[18px] border border-emerald-950/10 bg-slate-50 px-4"
+            className={formFieldCompact}
           />
         </label>
 
-        <label className="min-w-0 space-y-1.5 text-sm">
-          <span className="font-medium text-slate-700">更新申請期間終了日</span>
+        <label className={formFieldLabel}>
+          <span className={formLabelText}>更新申請期間終了日</span>
           <DateInput
             name="applicationEndOn"
             defaultValue={defaultApplicationEndOn}
-            className="min-h-12 w-full min-w-0 rounded-[18px] border border-emerald-950/10 bg-slate-50 px-4"
+            className={formFieldCompact}
           />
         </label>
 
-        <label className="min-w-0 space-y-1.5 text-sm lg:col-span-2">
-          <span className="font-medium text-slate-700">有効期間</span>
+        <label className={formFieldLabel + " lg:col-span-2"}>
+          <span className={formLabelText}>有効期間</span>
           <input
             name="validityDescription"
             defaultValue={defaultValidityDescription ?? ""}
             placeholder="例: 令和9年の誕生日まで"
-            className="min-h-12 w-full min-w-0 rounded-[18px] border border-emerald-950/10 bg-slate-50 px-4"
+            className={formFieldCompact}
           />
         </label>
       </div>

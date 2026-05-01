@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
+import { formFieldBase, formFieldLabel, formLabelText } from "@/lib/form-classes";
 import { prefectureOptions } from "@/lib/prefectures";
 
 type ReportLocationFieldsProps = {
@@ -24,13 +25,13 @@ export function ReportLocationFields({
 
   return (
     <>
-      <label className="report-prefecture-field min-w-0 space-y-1.5 text-sm">
-        <span className="font-medium text-slate-700">都道府県</span>
+      <label className={formFieldLabel}>
+        <span className={formLabelText}>都道府県</span>
         <select
           name="prefectureCode"
           value={prefectureCode}
           onChange={(event) => setPrefectureCode(event.target.value)}
-          className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+          className={formFieldBase}
         >
           {prefectureOptions.map((prefecture) => (
             <option key={prefecture.code} value={prefecture.code}>
@@ -40,14 +41,14 @@ export function ReportLocationFields({
         </select>
       </label>
 
-      <label className="report-area-field min-w-0 space-y-1.5 text-sm lg:col-span-2">
-        <span className="font-medium text-slate-700">市区町村名</span>
+      <label className={formFieldLabel + " lg:col-span-2"}>
+        <span className={formLabelText}>市区町村名</span>
         <input
           name="areaName"
           defaultValue={defaultMunicipalityName ?? ""}
           list={datalistId}
           placeholder="例: 札幌市"
-          className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+          className={formFieldBase}
         />
         <datalist id={datalistId}>
           {suggestions.map((municipalityName) => (

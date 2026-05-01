@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formFieldCompact, formFieldLabel, formLabelText, formTextareaCompact } from "@/lib/form-classes";
 
 const barrelTypeOptions = [
   { value: "RIFLED", label: "ライフル銃身" },
@@ -34,12 +35,12 @@ export function FirearmBarrelFields() {
             key={row.id}
             className="grid grid-cols-1 gap-3 rounded-[20px] border border-emerald-950/10 bg-emerald-50/50 p-3 lg:grid-cols-4"
           >
-            <label className="min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">銃身種別</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>銃身種別</span>
               <select
                 name="barrelType[]"
                 defaultValue={index === 0 ? "RIFLED" : "SMOOTHBORE"}
-                className="min-h-12 w-full min-w-0 rounded-[18px] border border-emerald-950/10 bg-white px-4"
+                className={formFieldCompact}
               >
                 {barrelTypeOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -49,76 +50,76 @@ export function FirearmBarrelFields() {
               </select>
             </label>
 
-            <label className="min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">種類</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>種類</span>
               <input
                 name="barrelFirearmKind[]"
                 placeholder="例: 散弾銃"
-                className="min-h-12 w-full min-w-0 rounded-[18px] border border-emerald-950/10 bg-white px-4"
+                className={formFieldCompact}
               />
             </label>
 
-            <label className="min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">銃身長</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>銃身長</span>
               <input
                 name="barrelLength[]"
                 placeholder="例: 660mm"
-                className="min-h-12 w-full min-w-0 rounded-[18px] border border-emerald-950/10 bg-white px-4"
+                className={formFieldCompact}
               />
             </label>
 
-            <label className="min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">口径</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>口径</span>
               <input
                 name="barrelCaliber[]"
                 placeholder="例: 12"
-                className="min-h-12 w-full min-w-0 rounded-[18px] border border-emerald-950/10 bg-white px-4"
+                className={formFieldCompact}
               />
             </label>
 
-            <label className="min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">用途メモ</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>用途メモ</span>
               <input
                 name="barrelPurposeMemo[]"
                 placeholder="例: 鹿猟用"
-                className="min-h-12 w-full min-w-0 rounded-[18px] border border-emerald-950/10 bg-white px-4"
+                className={formFieldCompact}
               />
             </label>
 
-            <label className="min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">銃腔内旋割合</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>銃腔内旋割合</span>
               <input
                 name="barrelRiflingRate[]"
                 placeholder="例: 1/5以上1/2以下"
-                className="min-h-12 w-full min-w-0 rounded-[18px] border border-emerald-950/10 bg-white px-4"
+                className={formFieldCompact}
               />
             </label>
 
-            <label className="min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">適合実包</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>適合実包</span>
               <input
                 name="barrelCompatibleAmmo[]"
                 placeholder="例: 12番"
-                className="min-h-12 w-full min-w-0 rounded-[18px] border border-emerald-950/10 bg-white px-4"
+                className={formFieldCompact}
               />
             </label>
 
-            <label className="min-w-0 space-y-1.5 text-sm lg:col-span-2">
-              <span className="font-medium text-slate-700">特徴</span>
+            <label className={formFieldLabel + " lg:col-span-2"}>
+              <span className={formLabelText}>特徴</span>
               <input
                 name="barrelFeatures[]"
                 placeholder="例: ハーフライフリングあり"
-                className="min-h-12 w-full min-w-0 rounded-[18px] border border-emerald-950/10 bg-white px-4"
+                className={formFieldCompact}
               />
             </label>
 
-            <label className="min-w-0 space-y-1.5 text-sm lg:col-span-4">
-              <span className="font-medium text-slate-700">備考</span>
+            <label className={formFieldLabel + " lg:col-span-4"}>
+              <span className={formLabelText}>備考</span>
               <textarea
                 name="barrelNotes[]"
                 rows={2}
                 placeholder="銃身ごとの補足を入力"
-                className="w-full min-w-0 rounded-[18px] border border-emerald-950/10 bg-white px-4 py-3"
+                className={formTextareaCompact}
               />
             </label>
 

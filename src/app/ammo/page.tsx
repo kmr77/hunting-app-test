@@ -1,6 +1,7 @@
 import { deleteAmmoAction, upsertAmmoAction } from "@/app/actions";
 import { FeedbackBanner } from "@/components/feedback-banner";
 import { DateInput } from "@/components/date-input";
+import { formFieldBase, formFieldLabel, formLabelText, formTextareaBase, formFieldCompact, formTextareaCompact } from "@/lib/form-classes";
 import { SubmitButton } from "@/components/submit-button";
 import {
   ammoCategoryOptions,
@@ -94,21 +95,21 @@ export default async function AmmoPage({
           </div>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
-            <label className="min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">取引日</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>取引日</span>
               <DateInput
                 name="transactionDate"
                 required
-                className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+                className={formFieldBase}
               />
             </label>
 
-            <label className="min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">記録区分</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>記録区分</span>
               <select
                 name="recordType"
                 defaultValue="PURCHASE"
-                className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+                className={formFieldBase}
               >
                 {ammoRecordTypeOptions.map((option) => (
                   <option key={option} value={option}>
@@ -118,12 +119,12 @@ export default async function AmmoPage({
               </select>
             </label>
 
-            <label className="min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">実包種別</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>実包種別</span>
               <select
                 name="ammoCategory"
                 defaultValue="SHOT_SHELL"
-                className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+                className={formFieldBase}
               >
                 {ammoCategoryOptions.map((option) => (
                   <option key={option} value={option}>
@@ -133,52 +134,52 @@ export default async function AmmoPage({
               </select>
             </label>
 
-            <label className="min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">数量</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>数量</span>
               <input
                 type="number"
                 name="quantity"
                 min={1}
                 required
                 defaultValue={25}
-                className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+                className={formFieldBase}
               />
             </label>
 
-            <label className="min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">口径</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>口径</span>
               <input
                 name="caliber"
                 placeholder="例: 12番"
-                className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+                className={formFieldBase}
               />
             </label>
 
-            <label className="min-w-0 space-y-1.5 text-sm lg:col-span-2">
-              <span className="font-medium text-slate-700">仕入先</span>
+            <label className={formFieldLabel + " lg:col-span-2"}>
+              <span className={formLabelText}>仕入先</span>
               <input
                 name="supplierName"
                 placeholder="例: 地元銃砲店"
-                className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+                className={formFieldBase}
               />
             </label>
 
-            <label className="min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">伝票番号</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>伝票番号</span>
               <input
                 name="slipNumber"
                 placeholder="例: 2026-04-001"
-                className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+                className={formFieldBase}
               />
             </label>
 
-            <label className="min-w-0 space-y-1.5 text-sm lg:col-span-4">
-              <span className="font-medium text-slate-700">メモ</span>
+            <label className={formFieldLabel + " lg:col-span-4"}>
+              <span className={formLabelText}>メモ</span>
               <textarea
                 name="memo"
                 rows={3}
                 placeholder="購入理由、消費の用途など"
-                className="w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3"
+                className={formTextareaBase}
               />
             </label>
           </div>
@@ -226,12 +227,12 @@ export default async function AmmoPage({
                       name="transactionDate"
                       required
                       defaultValue={formatDateInput(record.transactionDate)}
-                      className="min-h-12 min-w-0 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
+                      className={formFieldCompact}
                     />
                     <select
                       name="recordType"
                       defaultValue={record.recordType}
-                      className="min-h-12 min-w-0 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
+                      className={formFieldCompact}
                     >
                       {ammoRecordTypeOptions.map((option) => (
                         <option key={option} value={option}>
@@ -242,7 +243,7 @@ export default async function AmmoPage({
                     <select
                       name="ammoCategory"
                       defaultValue={record.ammoCategory}
-                      className="min-h-12 min-w-0 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
+                      className={formFieldCompact}
                     >
                       {ammoCategoryOptions.map((option) => (
                         <option key={option} value={option}>
@@ -256,32 +257,32 @@ export default async function AmmoPage({
                       required
                       name="quantity"
                       defaultValue={record.quantity}
-                      className="min-h-12 min-w-0 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
+                      className={formFieldCompact}
                     />
                     <input
                       name="caliber"
                       defaultValue={record.caliber ?? ""}
                       placeholder="口径"
-                      className="min-h-12 min-w-0 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
+                      className={formFieldCompact}
                     />
                     <input
                       name="supplierName"
                       defaultValue={record.supplierName ?? ""}
                       placeholder="仕入先"
-                      className="min-h-12 min-w-0 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm lg:col-span-2"
+                      className={formFieldCompact}
                     />
                     <input
                       name="slipNumber"
                       defaultValue={record.slipNumber ?? ""}
                       placeholder="伝票番号"
-                      className="min-h-12 min-w-0 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm"
+                      className={formFieldCompact}
                     />
                     <textarea
                       name="memo"
                       rows={2}
                       defaultValue={record.memo ?? ""}
                       placeholder="メモ"
-                      className="min-w-0 rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm lg:col-span-4"
+                      className={formTextareaCompact}
                     />
                   </div>
 

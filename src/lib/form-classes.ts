@@ -1,0 +1,9 @@
+export const formFieldBase = "min-h-12 w-full min-w-0 rounded-[20px] border border-slate-200 bg-slate-50 px-4";
+export const formTextareaBase = "w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3";
+export const formFieldCompact = "min-h-12 min-w-0 rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-sm";
+export const formTextareaCompact = "min-w-0 rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm";
+export const formFieldLabel = "min-w-0 space-y-1.5 text-sm";
+export const formLabelText = "font-medium text-slate-700";
+export const formHelperText = "text-xs leading-5 text-slate-500";
+export const formSectionCard = "rounded-[30px] border border-emerald-950/10 bg-white/92 p-5 shadow-[0_24px_50px_-36px_rgba(15,23,42,0.38)]";
+export const formErrorText = "mt-1 text-red-600 text-sm leading-6";

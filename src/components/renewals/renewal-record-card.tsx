@@ -10,6 +10,7 @@ import {
   updateRenewalPermitInfoAction,
 } from "@/app/actions";
 import { DateInput } from "@/components/date-input";
+import { formFieldCompact, formTextareaCompact, formFieldLabel, formLabelText } from "@/lib/form-classes";
 
 type Item = { label: string; value: string | null | undefined };
 type Barrel = {
@@ -153,17 +154,17 @@ export function RenewalRecordCard({ renewal }: { renewal: Renewal }) {
             <input type="hidden" name="id" value={renewal.id} />
             <Note />
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
-              <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">進捗</span><select name="status" defaultValue={renewal.status} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4"><option value="ACTIVE">管理中</option><option value="EXPIRED">要確認</option><option value="RENEWED">完了</option></select></label>
-              <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">交付日</span><DateInput name="issuedOn" defaultValue={renewal.issuedOn} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
-              <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">有効期限日</span><DateInput name="expiresOn" defaultValue={renewal.expiresOn} required className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
-              <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">原許可日</span><DateInput name="originalPermittedOn" defaultValue={renewal.originalPermittedOn} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
-              <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">最初の許可番号</span><input name="originalPermitNumber" defaultValue={renewal.originalPermitNumber ?? ""} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
-              <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">今回の許可番号</span><input name="permitNumber" defaultValue={renewal.permitNumber ?? ""} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
-              <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">確認日</span><DateInput name="confirmedOn" defaultValue={renewal.confirmedOn} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
-              <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">更新申請期間開始日</span><DateInput name="applicationStartOn" defaultValue={renewal.applicationStartOn} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
-              <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">更新申請期間終了日</span><DateInput name="applicationEndOn" defaultValue={renewal.applicationEndOn} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
-              <label className="space-y-1.5 text-sm lg:col-span-2"><span className="font-medium text-slate-700">有効期間</span><input name="validityDescription" defaultValue={renewal.validityDescription ?? ""} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
-              <label className="space-y-1.5 text-sm lg:col-span-4"><span className="font-medium text-slate-700">メモ</span><textarea name="notes" rows={2} defaultValue={renewal.notes ?? ""} className="w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+              <label className={formFieldLabel}><span className={formLabelText}>進捗</span><select name="status" defaultValue={renewal.status} className={formFieldCompact}><option value="ACTIVE">管理中</option><option value="EXPIRED">要確認</option><option value="RENEWED">完了</option></select></label>
+              <label className={formFieldLabel}><span className={formLabelText}>交付日</span><DateInput name="issuedOn" defaultValue={renewal.issuedOn} className={formFieldCompact} /></label>
+              <label className={formFieldLabel}><span className={formLabelText}>有効期限日</span><DateInput name="expiresOn" defaultValue={renewal.expiresOn} required className={formFieldCompact} /></label>
+              <label className={formFieldLabel}><span className={formLabelText}>原許可日</span><DateInput name="originalPermittedOn" defaultValue={renewal.originalPermittedOn} className={formFieldCompact} /></label>
+              <label className={formFieldLabel}><span className={formLabelText}>最初の許可番号</span><input name="originalPermitNumber" defaultValue={renewal.originalPermitNumber ?? ""} className={formFieldCompact} /></label>
+              <label className={formFieldLabel}><span className={formLabelText}>今回の許可番号</span><input name="permitNumber" defaultValue={renewal.permitNumber ?? ""} className={formFieldCompact} /></label>
+              <label className={formFieldLabel}><span className={formLabelText}>確認日</span><DateInput name="confirmedOn" defaultValue={renewal.confirmedOn} className={formFieldCompact} /></label>
+              <label className={formFieldLabel}><span className={formLabelText}>更新申請期間開始日</span><DateInput name="applicationStartOn" defaultValue={renewal.applicationStartOn} className={formFieldCompact} /></label>
+              <label className={formFieldLabel}><span className={formLabelText}>更新申請期間終了日</span><DateInput name="applicationEndOn" defaultValue={renewal.applicationEndOn} className={formFieldCompact} /></label>
+              <label className={formFieldLabel + " lg:col-span-2"}><span className={formLabelText}>有効期間</span><input name="validityDescription" defaultValue={renewal.validityDescription ?? ""} className={formFieldCompact} /></label>
+              <label className={formFieldLabel + " lg:col-span-4"}><span className={formLabelText}>メモ</span><textarea name="notes" rows={2} defaultValue={renewal.notes ?? ""} className={formTextareaCompact} /></label>
             </div>
             <Actions onCancel={() => setEditing(null)} />
           </form>
@@ -281,12 +282,12 @@ function FirearmForm({ firearm, onCancel, state, action }: { firearm: Firearm; o
           ["適合実包", "firearmCompatibleAmmo", firearm.compatibleAmmo],
           ["特徴", "firearmFeatures", firearm.features],
           ["用途", "firearmPurposeText", firearm.purposeText],
-        ].map(([label, name, value]) => <label key={name} className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">{label}</span><input name={name ?? ""} defaultValue={value ?? ""} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>)}
-        <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">許可日</span><DateInput name="firearmPermittedOn" defaultValue={firearm.permittedOn ?? ""} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
-        <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">有効期限日</span><DateInput name="firearmExpiresOn" defaultValue={firearm.expiresOn ?? ""} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
-        <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">銃種</span><select name="firearmType" defaultValue={firearm.firearmType} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4"><option value="RIFLE">ライフル銃</option><option value="SHOTGUN">散弾銃</option><option value="AIR_RIFLE">空気銃</option></select></label>
-        <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">状態</span><select name="firearmStatus" defaultValue={firearm.status} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4"><option value="ACTIVE">使用中</option><option value="INACTIVE">休止中</option><option value="DISPOSED">処分済み</option></select></label>
-        <label className="space-y-1.5 text-sm lg:col-span-4"><span className="font-medium text-slate-700">備考</span><textarea name="firearmNotes" rows={2} defaultValue={firearm.notes ?? ""} className="w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+        ].map(([label, name, value]) => <label key={name} className={formFieldLabel}><span className={formLabelText}>{label}</span><input name={name ?? ""} defaultValue={value ?? ""} className={formFieldCompact} /></label>)}
+        <label className={formFieldLabel}><span className={formLabelText}>許可日</span><DateInput name="firearmPermittedOn" defaultValue={firearm.permittedOn ?? ""} className={formFieldCompact} /></label>
+        <label className={formFieldLabel}><span className={formLabelText}>有効期限日</span><DateInput name="firearmExpiresOn" defaultValue={firearm.expiresOn ?? ""} className={formFieldCompact} /></label>
+        <label className={formFieldLabel}><span className={formLabelText}>銃種</span><select name="firearmType" defaultValue={firearm.firearmType} className={formFieldCompact}><option value="RIFLE">ライフル銃</option><option value="SHOTGUN">散弾銃</option><option value="AIR_RIFLE">空気銃</option></select></label>
+        <label className={formFieldLabel}><span className={formLabelText}>状態</span><select name="firearmStatus" defaultValue={firearm.status} className={formFieldCompact}><option value="ACTIVE">使用中</option><option value="INACTIVE">休止中</option><option value="DISPOSED">処分済み</option></select></label>
+        <label className={formFieldLabel + " lg:col-span-4"}><span className={formLabelText}>備考</span><textarea name="firearmNotes" rows={2} defaultValue={firearm.notes ?? ""} className={formTextareaCompact} /></label>
       </div>
       <Actions onCancel={onCancel} />
     </form>
@@ -340,7 +341,7 @@ function BarrelCard({ barrel, index, editing, onEdit, onCancel, state, action }:
         <input type="hidden" name="id" value={barrel.id} />
         <Note />
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
-          <label className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">銃身種別</span><select name="barrelType" defaultValue={barrel.barrelType} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4"><option value="RIFLED">ライフル銃身</option><option value="HALF_RIFLED">ハーフライフル銃身</option><option value="SMOOTHBORE">平筒</option><option value="OTHER">その他</option></select></label>
+          <label className={formFieldLabel}><span className={formLabelText}>銃身種別</span><select name="barrelType" defaultValue={barrel.barrelType} className={formFieldCompact}><option value="RIFLED">ライフル銃身</option><option value="HALF_RIFLED">ハーフライフル銃身</option><option value="SMOOTHBORE">平筒</option><option value="OTHER">その他</option></select></label>
           {[
             ["種類", "barrelFirearmKind", barrel.firearmKind],
             ["口径", "barrelCaliber", barrel.caliber],
@@ -348,9 +349,9 @@ function BarrelCard({ barrel, index, editing, onEdit, onCancel, state, action }:
             ["銃腔内旋割合", "barrelRiflingRate", barrel.riflingRate],
             ["適合実包", "barrelCompatibleAmmo", barrel.compatibleAmmo],
             ["特徴", "barrelFeatures", barrel.features],
-          ].map(([label, name, value]) => <label key={name} className="space-y-1.5 text-sm"><span className="font-medium text-slate-700">{label}</span><input name={name ?? ""} defaultValue={value ?? ""} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>)}
-          <label className="space-y-1.5 text-sm lg:col-span-2"><span className="font-medium text-slate-700">用途メモ</span><input name="barrelPurposeMemo" defaultValue={barrel.purposeMemo ?? ""} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
-          <label className="space-y-1.5 text-sm lg:col-span-2"><span className="font-medium text-slate-700">備考</span><input name="barrelNotes" defaultValue={barrel.notes ?? ""} className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4" /></label>
+          ].map(([label, name, value]) => <label key={name} className={formFieldLabel}><span className={formLabelText}>{label}</span><input name={name ?? ""} defaultValue={value ?? ""} className={formFieldCompact} /></label>)}
+          <label className={formFieldLabel + " lg:col-span-2"}><span className={formLabelText}>用途メモ</span><input name="barrelPurposeMemo" defaultValue={barrel.purposeMemo ?? ""} className={formFieldCompact} /></label>
+          <label className={formFieldLabel + " lg:col-span-2"}><span className={formLabelText}>備考</span><input name="barrelNotes" defaultValue={barrel.notes ?? ""} className={formFieldCompact} /></label>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <Actions onCancel={onCancel} />
@@ -390,12 +391,12 @@ function NewBarrelForm({
       <input type="hidden" name="firearmRecordId" value={firearmId} />
       <Note />
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
-        <label className="space-y-1.5 text-sm">
-          <span className="font-medium text-slate-700">銃身種別</span>
+        <label className={formFieldLabel}>
+          <span className={formLabelText}>銃身種別</span>
           <select
             name="barrelType"
             defaultValue="SMOOTHBORE"
-            className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4"
+            className={formFieldCompact}
           >
             <option value="RIFLED">ライフル銃身</option>
             <option value="HALF_RIFLED">ハーフライフル銃身</option>
@@ -411,26 +412,26 @@ function NewBarrelForm({
           ["適合実包", "barrelCompatibleAmmo"],
           ["特徴", "barrelFeatures"],
         ].map(([label, name]) => (
-          <label key={name} className="space-y-1.5 text-sm">
-            <span className="font-medium text-slate-700">{label}</span>
+          <label key={name} className={formFieldLabel}>
+            <span className={formLabelText}>{label}</span>
             <input
               name={name}
-              className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4"
+              className={formFieldCompact}
             />
           </label>
         ))}
-        <label className="space-y-1.5 text-sm lg:col-span-2">
-          <span className="font-medium text-slate-700">用途メモ</span>
+        <label className={formFieldLabel + " lg:col-span-2"}>
+          <span className={formLabelText}>用途メモ</span>
           <input
             name="barrelPurposeMemo"
-            className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4"
+            className={formFieldCompact}
           />
         </label>
-        <label className="space-y-1.5 text-sm lg:col-span-2">
-          <span className="font-medium text-slate-700">備考</span>
+        <label className={formFieldLabel + " lg:col-span-2"}>
+          <span className={formLabelText}>備考</span>
           <input
             name="barrelNotes"
-            className="min-h-12 w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4"
+            className={formFieldCompact}
           />
         </label>
       </div>

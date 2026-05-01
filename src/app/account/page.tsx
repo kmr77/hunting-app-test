@@ -1,6 +1,7 @@
 import { updateAccountAction } from "@/app/actions";
 import { FeedbackBanner } from "@/components/feedback-banner";
 import { DateInput } from "@/components/date-input";
+import { formFieldBase, formFieldLabel, formLabelText } from "@/lib/form-classes";
 import { SubmitButton } from "@/components/submit-button";
 import {
   getDataLoadErrorMessage,
@@ -83,62 +84,62 @@ export default async function AccountPage({
           </div>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            <label className="min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">姓</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>姓</span>
               <input
                 name="lastName"
                 required
                 defaultValue={profile?.lastName ?? ""}
-                className="min-h-12 w-full min-w-0 rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+                className={formFieldBase}
               />
             </label>
 
-            <label className="min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">名</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>名</span>
               <input
                 name="firstName"
                 required
                 defaultValue={profile?.firstName ?? ""}
-                className="min-h-12 w-full min-w-0 rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+                className={formFieldBase}
               />
             </label>
 
-            <label className="min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">メールアドレス</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>メールアドレス</span>
               <input
                 name="email"
                 type="email"
                 required
                 defaultValue={data?.email ?? "demo@local.hunting-app"}
-                className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+                className={formFieldBase}
               />
             </label>
 
-            <label className="min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">電話番号</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>電話番号</span>
               <input
                 name="phoneNumber"
                 defaultValue={profile?.phoneNumber ?? ""}
                 placeholder="例: 090-0000-0000"
-                className="min-h-12 w-full min-w-0 rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+                className={formFieldBase}
               />
             </label>
 
-            <label className="min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">生年月日</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>生年月日</span>
               <DateInput
                 name="birthDate"
                 defaultValue={formatDateInput(profile?.birthDate)}
-                className="min-h-12 w-full min-w-0 rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+                className={formFieldBase}
               />
             </label>
 
-            <label className="min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">利用状態</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>利用状態</span>
               <select
                 name="status"
                 defaultValue={data?.status ?? "ACTIVE"}
-                className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+                className={formFieldBase}
               >
                 {userStatusOptions.map((option) => (
                   <option key={option} value={option}>
@@ -148,12 +149,12 @@ export default async function AccountPage({
               </select>
             </label>
 
-            <label className="min-w-0 space-y-1.5 text-sm">
-              <span className="font-medium text-slate-700">プラン</span>
+            <label className={formFieldLabel}>
+              <span className={formLabelText}>プラン</span>
               <select
                 name="planCode"
                 defaultValue={data?.planCode ?? "FREE"}
-                className="min-h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+                className={formFieldBase}
               >
                 {planCodeOptions.map((option) => (
                   <option key={option} value={option}>
@@ -163,15 +164,15 @@ export default async function AccountPage({
               </select>
             </label>
 
-            <label className="min-w-0 space-y-1.5 text-sm lg:col-span-3">
-              <span className="font-medium text-slate-700">住所</span>
+            <label className={formFieldLabel + " lg:col-span-3"}>
+              <span className={formLabelText}>住所</span>
               <input
                 name="addressLine1"
                 defaultValue={[profile?.addressLine1, profile?.addressLine2]
                   .filter(Boolean)
                   .join(" ")}
                 placeholder="例：北海道札幌市中央区〇条〇丁目〇-〇"
-                className="min-h-12 w-full min-w-0 rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+                className={formFieldBase}
               />
             </label>
             <input type="hidden" name="prefectureCode" value="" />

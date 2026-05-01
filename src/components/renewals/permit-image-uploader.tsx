@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, type ChangeEvent } from "react";
+import { formFieldCompact, formFieldLabel, formLabelText } from "@/lib/form-classes";
 import { SubmitButton } from "@/components/submit-button";
 
 const MAX_IMAGE_EDGE = 1600;
@@ -97,14 +98,14 @@ export function PermitImageUploader({
       <input type="hidden" name="renewalRecordId" value={renewalRecordId} />
       <input type="hidden" name="compressedImageData" value={compressedImageData} />
       <input type="hidden" name="originalFileName" value={originalFileName} />
-      <label className="min-w-0 space-y-1.5 text-sm">
-        <span className="font-medium text-slate-700">許可証画像</span>
+      <label className={formFieldLabel}>
+        <span className={formLabelText}>許可証画像</span>
         <input
           ref={inputRef}
           type="file"
           accept="image/*"
           onChange={handleFileChange}
-          className="w-full min-w-0 rounded-[18px] border border-emerald-950/10 bg-white px-4 py-3 text-sm"
+          className={formFieldCompact}
         />
       </label>
       <p className="text-xs leading-6 text-slate-600">{status}</p>

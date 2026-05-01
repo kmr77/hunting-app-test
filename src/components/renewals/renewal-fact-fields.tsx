@@ -1,6 +1,7 @@
 "use client";
 
 import { DateInput } from "@/components/date-input";
+import { formFieldBase, formFieldLabel, formLabelText, formHelperText } from "@/lib/form-classes";
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import type { RenewalRuleConfig } from "@/lib/validation-rules";
@@ -162,13 +163,13 @@ export function RenewalFactFields({
 
   return (
     <>
-      <label className="min-w-0 space-y-1.5 text-sm">
-        <span className="font-medium text-slate-700">種別</span>
+      <label className={formFieldLabel}>
+        <span className={formLabelText}>種別</span>
         <select
           name="category"
           value={category}
           onChange={(event) => setCategory(event.target.value as RenewalCategoryValue)}
-          className="min-h-12 w-full min-w-0 rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+          className={formFieldBase}
         >
           {categoryOptions.map((option) => (
             <option key={option.value} value={option.value}>
@@ -178,12 +179,12 @@ export function RenewalFactFields({
         </select>
       </label>
 
-      <label className="min-w-0 space-y-1.5 text-sm">
-        <span className="font-medium text-slate-700">進捗</span>
+      <label className={formFieldLabel}>
+        <span className={formLabelText}>進捗</span>
         <select
           name="status"
           defaultValue={normalizeStatus(defaultStatus)}
-          className="min-h-12 w-full min-w-0 rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+          className={formFieldBase}
         >
           {statusOptions.map((option) => (
             <option key={option.value} value={option.value}>
@@ -193,29 +194,29 @@ export function RenewalFactFields({
         </select>
       </label>
 
-      <label className="min-w-0 space-y-1.5 text-sm">
-        <span className="font-medium text-slate-700">交付日</span>
+      <label className={formFieldLabel}>
+        <span className={formLabelText}>交付日</span>
         <DateInput
           name="issuedOn"
           value={issuedOn}
           onChange={(event) => setIssuedOn(event.target.value)}
-          className="min-h-12 w-full min-w-0 rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+          className={formFieldBase}
         />
-        <span className="block text-xs leading-5 text-slate-500">
+        <span className={formHelperText}>
           免状・許可証に記載されている交付日を入力します。
         </span>
       </label>
 
-      <label className="min-w-0 space-y-1.5 text-sm">
-        <span className="font-medium text-slate-700">有効期限日</span>
+      <label className={formFieldLabel}>
+        <span className={formLabelText}>有効期限日</span>
         <DateInput
           name="expiresOn"
           required
           value={expiresOn}
           onChange={(event) => setExpiresOn(event.target.value)}
-          className="min-h-12 w-full min-w-0 rounded-[20px] border border-slate-200 bg-slate-50 px-4"
+          className={formFieldBase}
         />
-        <span className="block text-xs leading-5 text-slate-500">
+        <span className={formHelperText}>
           免状・許可証に記載されている有効期限日を入力します。
         </span>
       </label>
