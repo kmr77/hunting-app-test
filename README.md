@@ -173,6 +173,8 @@ npm run build
 - [TODO.md](./TODO.md)
 - [DECISIONS.md](./DECISIONS.md)
 - [CHANGELOG.md](./CHANGELOG.md)
+- [DEPLOY_CHECKLIST.md](./DEPLOY_CHECKLIST.md) — 本番化前チェックリスト
+- [DEPLOY_OPTIONS.md](./DEPLOY_OPTIONS.md) — デプロイ先環境比較
 
 ## 作業開始時に読む順番
 

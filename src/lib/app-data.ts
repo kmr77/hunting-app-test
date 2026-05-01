@@ -88,8 +88,12 @@ export async function ensureDemoUser() {
   });
 }
 
+export async function getCurrentUser() {
+  return ensureDemoUser();
+}
+
 export async function getDemoUserBundle() {
-  const user = await ensureDemoUser();
+  const user = await getCurrentUser();
 
   return withPrismaRetry((prisma) =>
     prisma.user.findUniqueOrThrow({
@@ -162,7 +166,7 @@ export function getDataLoadErrorMessage(error: unknown) {
 }
 
 export async function getDashboardSummary() {
-  const user = await ensureDemoUser();
+  const user = await getCurrentUser();
 
   const renewals = await withPrismaRetry((prisma) =>
     prisma.renewalRecord.count({
@@ -212,7 +216,7 @@ export async function getDashboardSummary() {
 }
 
 export async function getRenewalPageData() {
-  const user = await ensureDemoUser();
+  const user = await getCurrentUser();
 
   const [renewalRuleConfigs, renewals] = await Promise.all([
     Promise.all([
@@ -268,7 +272,7 @@ export async function getRenewalPageData() {
 }
 
 export async function getAmmoPageData() {
-  const user = await ensureDemoUser();
+  const user = await getCurrentUser();
 
   const ammoRecords = await withPrismaRetry((prisma) =>
     prisma.ammoRecord.findMany({
@@ -292,7 +296,7 @@ export async function getAmmoPageData() {
 }
 
 export async function getReportPageData() {
-  const user = await ensureDemoUser();
+  const user = await getCurrentUser();
 
   const [huntingEvents, municipalitySuggestionRows] = await withPrismaRetry(
     (prisma) =>
@@ -375,7 +379,7 @@ export async function getReportPageData() {
 }
 
 export async function getAccountPageData() {
-  const user = await ensureDemoUser();
+  const user = await getCurrentUser();
 
   return withPrismaRetry((prisma) =>
     prisma.user.findUniqueOrThrow({

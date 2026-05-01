@@ -1,11 +1,24 @@
 # CHANGELOG
 
+## 2026-05-01
+
+### Added
+- DEPLOY_OPTIONS.md を、旧7候補比較から Vercel 本番化前提の3案比較へ置き換え。
+  - Vercel + Neon、Vercel + Supabase、Vercel + Vercel Blob を比較。
+  - Next.js 16 / Server Actions、Prisma 7 / PostgreSQL、画像アップロード、認証、無料枠、自分専用テスト、一般公開MVPの観点で整理。
+  - Vercel Blob はDBではなく画像保存候補であり、PostgreSQLは別途必要であることを明記。
+  - 推奨構成を「一般公開MVP視野なら Vercel + Supabase」「最短自分専用テストなら Vercel + Neon + Vercel Blob」と整理。
+
+- DEPLOY_CHECKLIST.md を追加し、自分専用本番テスト公開前の確認事項を整理。
+  - 現在の前提から本番化の課題まで15項目構成。
+  - 自分専用版と一般公開版の要件差分を明記。
+  - デプロイ前チェック、本番環境候補、DB方針、セキュリティ確認、バックアップ方針を整理。
+  - デプロイ後の動作確認項目とフェーズ別実装順序を提示。
+
 ## 2026-04-29
 
 ### Changed
-- 成功/失敗メッセージの表示ルールを統一。FeedbackBanner のラベルを「成功」/「失敗」に変更し、メッセージ文言を操作内容が分かるように調整（例: 保存しました、削除しました、画像を登録しましたなど）。
-- `/renewals` `/ammo` `/reports` の空状態メッセージと一覧件数表記を整理。空状態では次のアクションを短く案内し、件数表示を実務向けに明確化した。
-- 共通フォームのクラスを整理し、`/account`、`/ammo`、`/reports`、`/renewals` のラベル、入力、テキストエリア、select、カード余白を共通スタイルへ統一した。
+- 許可証画像保存処理を `src/lib/permit-storage.ts` wrapper に分離し、将来の外部ストレージ移行を容易にした。保存先はローカルのまま維持。
 
 ## 2026-04-26
 

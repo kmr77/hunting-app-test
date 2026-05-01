@@ -107,3 +107,35 @@
   - 編集ボタンを押したセクションだけフォームへ切り替える。
   - 保存またはキャンセル後は表示モードへ戻す。
   - 登録結果の重複表示セクションは置かず、通常カード表示を登録結果表示として扱う。
+
+## 2026-05-01: 認証導入前提として current user 取得を共通ラッパーへまとめる
+- 理由:
+  - 固定デモユーザーのまま動作を維持しつつ、将来の本番認証導入時に差し替えやすい境界を作るため。
+  - 現在の `ensureDemoUser()` を直接参照する箇所を減らし、User取得ロジックを1か所に集約することで移行リスクを下げるため。
+- 影響:
+  - `src/lib/app-data.ts` に `getCurrentUser()` を追加し、現状では `ensureDemoUser()` を通す構成とする。
+  - `src/app/actions.ts` の Server Action は `getCurrentUser()` を使ってデモユーザーを取得するように変更する。
+  - `src/lib/app-data.ts` 内のページデータ取得関数も可能な範囲で `getCurrentUser()` を使うように寄せる。
+  - 既存の `userId` による所有確認は維持し、認証未実装時のデータ保護ロジックは変えない。
+
+## 2026-05-01: 許可証画像保存を wrapper に分離し、将来の外部ストレージ移行を容易にする
+- 理由:
+  - 現在のローカル保存を維持しつつ、S3/R2/Supabase などへの差し替えを容易にするため。
+  - `actions.ts` が直接 `fs.writeFile`/`unlink` を呼ばない構成にし、保存ロジックを一箇所に集約するため。
+  - 本番ローカル保存のリスクを認識しつつ、MVP 段階では外部ストレージ実装を後回しにするため。
+- 影響:
+  - `src/lib/permit-storage.ts` を新規作成し、`savePermitImage`/`deletePermitImage`/`getPublicUrl`/`isLocalStorageKey` を提供。
+  - `src/app/actions.ts` の許可証画像アップロード・削除処理から直接 fs 操作を除去し、wrapper を経由する。
+  - `storageKey` の形式（`/uploads/renewal-permits/...`）と `file_records` 連携は維持。
+  - 既存画像の表示 URL とアップロード・削除機能は変更なし。
+  - 将来の外部ストレージ移行時は wrapper の実装を差し替えるだけで対応可能。
+
+## 2026-05-01: Vercel本番化は Supabase を第一候補、Neon + Blob を最短テスト候補にする
+- 理由:
+  - 一般公開MVPでは、PostgreSQLだけでなく認証、許可証画像保存、ユーザー別データ分離が必要になるため。
+  - Supabase は PostgreSQL / Auth / Storage をまとめやすく、メール+パスワード認証や画像保存の将来要件と近いため。
+  - 一方で、自分専用テストを最短で始めるだけなら Neon PostgreSQL と Vercel Blob の組み合わせが軽く、役割分担も分かりやすいため。
+- 影響:
+  - 実際の接続作業前に、一般公開MVPを見据えて Supabase に寄せるか、最短テストとして Neon + Blob で進めるかを決める。
+  - Vercel Blob はDBではなく画像保存候補として扱い、Prisma / PostgreSQL の本番DBは別途必要とする。
+  - 本番接続、環境変数設定、DB作成、画像保存実装、認証導入はまだ行わない。

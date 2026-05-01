@@ -21,7 +21,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { ensureDemoUser } from "@/lib/app-data";
+import { getCurrentUser } from "@/lib/app-data";
 import { withPrismaRetry } from "@/lib/prisma";
 import { resolveRenewalRule } from "@/lib/validation-rules";
 import {
@@ -33,19 +33,13 @@ import {
   normalizeWhitespace,
   toHalfWidthAlnum,
 } from "@/lib/normalize";
+import { savePermitImage, deletePermitImage } from "@/lib/permit-storage";
 
 export type FieldErrors = Record<string, string>;
 export type RenewalActionResult =
   | { success: true }
   | { success: false; errors?: FieldErrors; message?: string };
 
-const PERMIT_IMAGE_UPLOAD_DIR = path.join(
-  process.cwd(),
-  "public",
-  "uploads",
-  "renewal-permits",
-);
-const PERMIT_IMAGE_PUBLIC_DIR = "/uploads/renewal-permits";
 const PERMIT_IMAGE_MAX_BYTES = 1_600_000;
 const PERMIT_IMAGE_MIME_TYPE = "image/webp";
 
@@ -229,10 +223,6 @@ function parseCompressedPermitImage(formData: FormData) {
   };
 }
 
-function publicStorageKey(fileName: string) {
-  return `${PERMIT_IMAGE_PUBLIC_DIR}/${fileName}`;
-}
-
 async function requireAmmoRecord(id: string, userId: string) {
   const record = await withPrismaRetry((prisma) =>
     prisma.ammoRecord.findFirst({
@@ -334,7 +324,7 @@ export async function upsertRenewalAction(
   };
 
   try {
-    const user = await ensureDemoUser();
+    const user = await getCurrentUser();
     if (id) {
       await requireRenewalRecord(id, user.id);
       await withPrismaRetry((prisma) =>
@@ -411,7 +401,7 @@ export async function deleteRenewalAction(formData: FormData) {
   }
 
   try {
-    const user = await ensureDemoUser();
+    const user = await getCurrentUser();
     await requireRenewalRecord(id, user.id);
 
     await withPrismaRetry((prisma) =>
@@ -479,7 +469,7 @@ export async function updateRenewalPermitInfoAction(
   }
 
   try {
-    const user = await ensureDemoUser();
+    const user = await getCurrentUser();
     const renewal = await requireRenewalRecord(id, user.id);
     const category = renewal.category;
     const renewalRuleConfig = await resolveRenewalRule("COMMON", category);
@@ -559,7 +549,7 @@ export async function updateFirearmRecordAction(
   }
 
   try {
-    const user = await ensureDemoUser();
+    const user = await getCurrentUser();
     const firearm = await withPrismaRetry((prisma) =>
       prisma.firearmRecord.findFirst({
         where: {
@@ -649,7 +639,7 @@ export async function updateFirearmBarrelRecordAction(
   }
 
   try {
-    const user = await ensureDemoUser();
+    const user = await getCurrentUser();
     const barrel = await withPrismaRetry((prisma) =>
       prisma.firearmBarrelRecord.findFirst({
         where: {
@@ -712,7 +702,7 @@ export async function createFirearmBarrelRecordAction(formData: FormData) {
   }
 
   try {
-    const user = await ensureDemoUser();
+    const user = await getCurrentUser();
     const firearm = await withPrismaRetry((prisma) =>
       prisma.firearmRecord.findFirst({
         where: {
@@ -770,7 +760,7 @@ export async function deleteFirearmBarrelRecordAction(formData: FormData) {
   }
 
   try {
-    const user = await ensureDemoUser();
+    const user = await getCurrentUser();
     const barrel = await withPrismaRetry((prisma) =>
       prisma.firearmBarrelRecord.findFirst({
         where: {
@@ -819,7 +809,7 @@ export async function deleteFirearmRecordAction(formData: FormData) {
   }
 
   try {
-    const user = await ensureDemoUser();
+    const user = await getCurrentUser();
     const firearm = await withPrismaRetry((prisma) =>
       prisma.firearmRecord.findFirst({
         where: {
@@ -875,36 +865,27 @@ export async function uploadRenewalPermitImageAction(formData: FormData) {
   }
 
   try {
-    const user = await ensureDemoUser();
+    const user = await getCurrentUser();
     const renewal = await requireRenewalRecord(renewalRecordId, user.id);
 
     if (renewal.category !== RenewalCategory.GUN_LICENSE) {
       throw new Error("許可証画像は銃砲所持許可にのみ登録できます。");
     }
 
+    const previousFiles = await prisma.fileRecord.findMany({
+      where: {
+        userId: user.id,
+        renewalRecordId,
+        fileCategory: FileCategory.LICENSE_COPY,
+        deletedAt: null,
+      },
+      select: { storageKey: true },
+    });
+
     const { buffer, originalFileName } = parseCompressedPermitImage(formData);
-    await mkdir(PERMIT_IMAGE_UPLOAD_DIR, { recursive: true });
 
     const fileName = `${renewalRecordId}-${randomUUID()}.webp`;
-    const filePath = path.join(PERMIT_IMAGE_UPLOAD_DIR, fileName);
-    const storageKey = publicStorageKey(fileName);
-
-    const previousFiles = await withPrismaRetry((prisma) =>
-      prisma.fileRecord.findMany({
-        where: {
-          userId: user.id,
-          renewalRecordId,
-          fileCategory: FileCategory.LICENSE_COPY,
-          deletedAt: null,
-        },
-        select: {
-          id: true,
-          storageKey: true,
-        },
-      }),
-    );
-
-    await writeFile(filePath, buffer);
+    const { storageKey } = await savePermitImage(buffer, fileName);
 
     await withPrismaRetry((prisma) =>
       prisma.$transaction([
@@ -932,11 +913,7 @@ export async function uploadRenewalPermitImageAction(formData: FormData) {
     );
 
     await Promise.allSettled(
-      previousFiles
-        .filter((file) => file.storageKey.startsWith(PERMIT_IMAGE_PUBLIC_DIR))
-        .map((file) =>
-          unlink(path.join(process.cwd(), "public", file.storageKey.slice(1))),
-        ),
+      previousFiles.map((file) => deletePermitImage(file.storageKey)),
     );
   } catch (error) {
     const message =
@@ -960,7 +937,7 @@ export async function deleteRenewalPermitImageAction(formData: FormData) {
   }
 
   try {
-    const user = await ensureDemoUser();
+    const user = await getCurrentUser();
     await requireRenewalRecord(renewalRecordId, user.id);
 
     const file = await withPrismaRetry((prisma) =>
@@ -990,11 +967,7 @@ export async function deleteRenewalPermitImageAction(formData: FormData) {
       }),
     );
 
-    if (file.storageKey.startsWith(PERMIT_IMAGE_PUBLIC_DIR)) {
-      await unlink(path.join(process.cwd(), "public", file.storageKey.slice(1))).catch(
-        () => undefined,
-      );
-    }
+    await deletePermitImage(file.storageKey);
   } catch (error) {
     const message =
       error instanceof Error
@@ -1036,7 +1009,7 @@ export async function upsertAmmoAction(formData: FormData) {
   };
 
   try {
-    const user = await ensureDemoUser();
+    const user = await getCurrentUser();
     if (id) {
       await requireAmmoRecord(id, user.id);
       await withPrismaRetry((prisma) =>
@@ -1078,7 +1051,7 @@ export async function deleteAmmoAction(formData: FormData) {
   }
 
   try {
-    const user = await ensureDemoUser();
+    const user = await getCurrentUser();
     await requireAmmoRecord(id, user.id);
 
     await withPrismaRetry((prisma) =>
@@ -1144,7 +1117,7 @@ export async function upsertHuntingEventAction(formData: FormData) {
   const toolName = getOptionalString(formData, "toolName");
 
   try {
-    const user = await ensureDemoUser();
+    const user = await getCurrentUser();
     if (id) {
       await requireHuntingEvent(id, user.id);
 
@@ -1231,7 +1204,7 @@ export async function deleteHuntingEventAction(formData: FormData) {
   }
 
   try {
-    const user = await ensureDemoUser();
+    const user = await getCurrentUser();
     await requireHuntingEvent(id, user.id);
 
     await withPrismaRetry((prisma) =>
@@ -1267,7 +1240,7 @@ export async function toggleImportedToReportAction(formData: FormData) {
   }
 
   try {
-    const user = await ensureDemoUser();
+    const user = await getCurrentUser();
     await requireHuntingEvent(id, user.id);
 
     await withPrismaRetry((prisma) =>
@@ -1311,7 +1284,7 @@ export async function updateAccountAction(formData: FormData) {
   }
 
   try {
-    const user = await ensureDemoUser();
+    const user = await getCurrentUser();
     const profile = user.profile;
 
     await withPrismaRetry((prisma) =>
