@@ -63,7 +63,6 @@
 ### 本番環境選択・セットアップ
 
 - [x] デプロイ先環境を比較する（Vercel+Neon / Vercel+Supabase / Vercel Blob）
-- [x] 最有力環境を選定する（一般公開MVP視野なら Vercel + Supabase、最短テストなら Vercel + Neon + Vercel Blob）
 - [ ] デプロイ先環境を選定する（Vercel / レンタルサーバー / 自宅等）
 - [ ] 本番 PostgreSQL を選定・セットアップする（Neon / Supabase / RDS / レンタルサーバー等）
 - [ ] 本番環境用 `.env` テンプレートを作成

@@ -5,9 +5,9 @@
 ### Added
 - DEPLOY_OPTIONS.md を、旧7候補比較から Vercel 本番化前提の3案比較へ置き換え。
   - Vercel + Neon、Vercel + Supabase、Vercel + Vercel Blob を比較。
-  - Next.js 16 / Server Actions、Prisma 7 / PostgreSQL、画像アップロード、認証、無料枠、自分専用テスト、一般公開MVPの観点で整理。
+  - Next.js 16 / Server Actions、Prisma 7 / PostgreSQL、画像アップロード、認証、無料枠の観点で整理。
   - Vercel Blob はDBではなく画像保存候補であり、PostgreSQLは別途必要であることを明記。
-  - 推奨構成を「一般公開MVP視野なら Vercel + Supabase」「最短自分専用テストなら Vercel + Neon + Vercel Blob」と整理。
+  - 3案比較を整理。採用判断は保留。
 
 - DEPLOY_CHECKLIST.md を追加し、自分専用本番テスト公開前の確認事項を整理。
   - 現在の前提から本番化の課題まで15項目構成。
