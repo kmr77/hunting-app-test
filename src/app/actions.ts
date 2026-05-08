@@ -872,15 +872,17 @@ export async function uploadRenewalPermitImageAction(formData: FormData) {
       throw new Error("許可証画像は銃砲所持許可にのみ登録できます。");
     }
 
-    const previousFiles = await prisma.fileRecord.findMany({
-      where: {
-        userId: user.id,
-        renewalRecordId,
-        fileCategory: FileCategory.LICENSE_COPY,
-        deletedAt: null,
-      },
-      select: { storageKey: true },
-    });
+    const previousFiles = await withPrismaRetry((prisma) =>
+      prisma.fileRecord.findMany({
+        where: {
+          userId: user.id,
+          renewalRecordId,
+          fileCategory: FileCategory.LICENSE_COPY,
+          deletedAt: null,
+        },
+        select: { storageKey: true },
+      }),
+    );
 
     const { buffer, originalFileName } = parseCompressedPermitImage(formData);
 

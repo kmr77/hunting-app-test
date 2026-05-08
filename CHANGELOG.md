@@ -7,7 +7,11 @@
   - Vercel + Neon、Vercel + Supabase、Vercel + Vercel Blob を比較。
   - Next.js 16 / Server Actions、Prisma 7 / PostgreSQL、画像アップロード、認証、無料枠の観点で整理。
   - Vercel Blob はDBではなく画像保存候補であり、PostgreSQLは別途必要であることを明記。
-  - 3案比較を整理。採用判断は保留。
+  - 3案比較を整理。一般公開MVPの正式構成判断は保留。
+- 第1段階の自分専用本番テスト構成を Vercel + Neon に決定。
+  - 一般公開MVPの正式構成は未確定。
+  - 画像アップロードは第1段階の本番確認対象外。
+  - 第1段階では Next.js 16 / Server Actions / Prisma 7 / PostgreSQL / 主要ページ表示 / 画像アップロード以外の CRUD を確認する。
 
 - DEPLOY_CHECKLIST.md を追加し、自分専用本番テスト公開前の確認事項を整理。
   - 現在の前提から本番化の課題まで15項目構成。
