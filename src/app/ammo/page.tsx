@@ -96,7 +96,7 @@ export default async function AmmoPage({
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
             <label className={formFieldLabel}>
-              <span className={formLabelText}>取引日</span>
+              <span className={formLabelText}>日付</span>
               <DateInput
                 name="transactionDate"
                 required
