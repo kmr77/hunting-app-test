@@ -8,6 +8,7 @@ import {
   getAccountPageData,
   planCodeOptions,
   userStatusOptions,
+  type AccountPageData,
 } from "@/lib/app-data";
 import {
   getFeedbackFromSearchParams,
@@ -25,7 +26,7 @@ export default async function AccountPage({
 }) {
   const searchFeedback = await getFeedbackFromSearchParams(searchParams);
   let feedback = searchFeedback;
-  let data: Awaited<ReturnType<typeof getAccountPageData>> | null = null;
+  let data: AccountPageData | null = null;
 
   try {
     data = await getAccountPageData();

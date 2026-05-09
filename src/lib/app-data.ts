@@ -11,6 +11,11 @@ import {
   RenewalCategory,
   RenewalStatus,
   UserStatus,
+  User,
+  UserProfile,
+  RenewalRecord,
+  AmmoRecord,
+  HuntingEvent,
 } from "@prisma/client";
 import { DEFAULT_RENEWAL_RULE_CONFIG, resolveRenewalRule, type RenewalRuleConfig } from "@/lib/validation-rules";
 import { withPrismaRetry } from "@/lib/prisma";
@@ -378,7 +383,14 @@ export async function getReportPageData() {
   return { user, huntingEvents, municipalitySuggestionsByPrefecture };
 }
 
-export async function getAccountPageData() {
+export type AccountPageData = User & {
+  profile: UserProfile | null;
+  renewalRecords: RenewalRecord[];
+  ammoRecords: AmmoRecord[];
+  huntingEvents: HuntingEvent[];
+};
+
+export async function getAccountPageData(): Promise<AccountPageData> {
   const user = await getCurrentUser();
 
   return withPrismaRetry((prisma) =>
