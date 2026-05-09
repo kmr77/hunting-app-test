@@ -34,9 +34,9 @@ export const dynamic = "force-dynamic";
 export default async function RenewalsPage({
   searchParams,
 }: {
-  searchParams?: SearchParamsInput;
+  searchParams?: Promise<SearchParamsInput>;
 }) {
-  const searchFeedback = await getFeedbackFromSearchParams(searchParams);
+  const searchFeedback = await getFeedbackFromSearchParams(await searchParams);
   let feedback = searchFeedback;
   let renewals: Awaited<ReturnType<typeof getRenewalPageData>>["renewals"] =
     getRenewalPageDataFallback().renewals as Awaited<

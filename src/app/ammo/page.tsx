@@ -25,9 +25,9 @@ export const dynamic = "force-dynamic";
 export default async function AmmoPage({
   searchParams,
 }: {
-  searchParams?: SearchParamsInput;
+  searchParams?: Promise<SearchParamsInput>;
 }) {
-  const searchFeedback = await getFeedbackFromSearchParams(searchParams);
+  const searchFeedback = await getFeedbackFromSearchParams(await searchParams);
   let feedback = searchFeedback;
   let ammoRecords: Awaited<ReturnType<typeof getAmmoPageData>>["ammoRecords"] =
     getAmmoPageDataFallback().ammoRecords as Awaited<

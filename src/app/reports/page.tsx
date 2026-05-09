@@ -35,9 +35,9 @@ export const dynamic = "force-dynamic";
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams?: SearchParamsInput;
+  searchParams?: Promise<SearchParamsInput>;
 }) {
-  const searchFeedback = await getFeedbackFromSearchParams(searchParams);
+  const searchFeedback = await getFeedbackFromSearchParams(await searchParams);
   let feedback = searchFeedback;
   let huntingEvents: Awaited<ReturnType<typeof getReportPageData>>["huntingEvents"] =
     getReportPageDataFallback().huntingEvents as Awaited<

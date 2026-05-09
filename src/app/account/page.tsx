@@ -22,9 +22,9 @@ export const dynamic = "force-dynamic";
 export default async function AccountPage({
   searchParams,
 }: {
-  searchParams?: SearchParamsInput;
+  searchParams?: Promise<SearchParamsInput>;
 }) {
-  const searchFeedback = await getFeedbackFromSearchParams(searchParams);
+  const searchFeedback = await getFeedbackFromSearchParams(await searchParams);
   let feedback = searchFeedback;
   let data: AccountPageData | null = null;
 
