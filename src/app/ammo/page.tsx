@@ -59,7 +59,7 @@ export default async function AmmoPage({
               実包の購入と消費を日付順に管理
             </h2>
             <p className="max-w-2xl text-sm leading-7 text-slate-600">
-              仕入先や伝票番号を残しながら、散弾実包やスラッグの残数を確認できます。
+              仕入先や用途を残しながら、散弾実包やスラッグの残数を確認できます。
             </p>
           </div>
 
@@ -164,15 +164,6 @@ export default async function AmmoPage({
               />
             </label>
 
-            <label className={formFieldLabel}>
-              <span className={formLabelText}>伝票番号</span>
-              <input
-                name="slipNumber"
-                placeholder="例: 2026-04-001"
-                className={formFieldBase}
-              />
-            </label>
-
             <label className={formFieldLabel + " lg:col-span-4"}>
               <span className={formLabelText}>メモ</span>
               <textarea
@@ -269,12 +260,6 @@ export default async function AmmoPage({
                       name="supplierName"
                       defaultValue={record.supplierName ?? ""}
                       placeholder="仕入先"
-                      className={formFieldCompact}
-                    />
-                    <input
-                      name="slipNumber"
-                      defaultValue={record.slipNumber ?? ""}
-                      placeholder="伝票番号"
                       className={formFieldCompact}
                     />
                     <textarea

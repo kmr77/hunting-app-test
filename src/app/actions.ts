@@ -259,7 +259,7 @@ async function requireHuntingEvent(id: string, userId: string) {
   );
 
   if (!event) {
-    throw new Error("対象の狩猟記録が見つかりません。");
+    throw new Error("対象の活動記録が見つかりません。");
   }
 
   return event;
@@ -1185,7 +1185,7 @@ export async function upsertHuntingEventAction(formData: FormData) {
     }
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "狩猟記録の保存に失敗しました。";
+      error instanceof Error ? error.message : "活動記録の保存に失敗しました。";
     redirectWithMessage(pathname, "error", message);
   }
 
@@ -1193,7 +1193,7 @@ export async function upsertHuntingEventAction(formData: FormData) {
   redirectWithMessage(
     pathname,
     "success",
-    id ? "狩猟記録を更新しました。" : "狩猟記録を登録しました。",
+    id ? "活動記録を更新しました。" : "活動記録を登録しました。",
   );
 }
 
@@ -1224,7 +1224,7 @@ export async function deleteHuntingEventAction(formData: FormData) {
     );
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "狩猟記録の削除に失敗しました。";
+      error instanceof Error ? error.message : "活動記録の削除に失敗しました。";
     redirectWithMessage(pathname, "error", message);
   }
 
@@ -1238,7 +1238,7 @@ export async function toggleImportedToReportAction(formData: FormData) {
   const imported = getString(formData, "imported") === "true";
 
   if (!id) {
-    redirectWithMessage(pathname, "error", "対象の狩猟記録が見つかりません。");
+    redirectWithMessage(pathname, "error", "対象の活動記録が見つかりません。");
   }
 
   try {

@@ -28,8 +28,8 @@ const quickActions = [
   },
   {
     href: "/reports",
-    title: "報告書転記",
-    description: "狩猟記録から転記用の要点を整理します。",
+    title: "活動記録",
+    description: "活動記録を整理します。",
     accent: "bg-emerald-50 text-emerald-900",
     cta: "記録を見る",
   },
@@ -75,7 +75,7 @@ export default async function Home() {
               ひと目で確認できます
             </h2>
             <p className="max-w-2xl text-sm leading-7 text-emerald-50/90">
-              更新期限、実包残数、報告書転記待ちをまとめて確認するための
+              更新期限、実包残数、活動記録の転記待ちをまとめて確認するための
               ローカル業務アプリです。日常の記録をスマホ中心で扱える前提に
               整えています。
             </p>
@@ -124,12 +124,12 @@ export default async function Home() {
         </article>
         <article className="rounded-[28px] border border-emerald-950/10 bg-white/92 p-5 shadow-[0_22px_40px_-32px_rgba(15,23,42,0.34)]">
           <p className="text-xs font-semibold tracking-[0.18em] text-slate-500 uppercase">
-            報告書転記
+            活動記録
           </p>
           <p className="mt-3 text-3xl font-semibold text-slate-950">
             {summary.pendingReports} 件
           </p>
-          <p className="mt-2 text-sm text-slate-600">未転記の狩猟記録</p>
+          <p className="mt-2 text-sm text-slate-600">未転記の活動記録</p>
         </article>
         <article className="rounded-[28px] border border-emerald-950/10 bg-[linear-gradient(180deg,#f7faf7_0%,#eef5ef_100%)] p-5 shadow-[0_22px_40px_-32px_rgba(15,23,42,0.34)]">
           <p className="text-xs font-semibold tracking-[0.18em] text-slate-500 uppercase">
@@ -137,8 +137,8 @@ export default async function Home() {
           </p>
           <ul className="mt-3 space-y-2 text-sm leading-7 text-slate-700">
             <li>更新期限を先に確認</li>
-            <li>狩猟後は実包と記録を同日に登録</li>
-            <li>報告書転記後に状態を切替</li>
+            <li>活動後は実包と記録を同日に登録</li>
+            <li>転記後に状態を切替</li>
           </ul>
         </article>
       </section>

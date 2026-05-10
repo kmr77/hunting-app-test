@@ -68,10 +68,10 @@ export default async function ReportsPage({
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-2">
             <p className="text-[11px] font-semibold tracking-[0.22em] text-emerald-700 uppercase">
-              報告書転記
+              活動記録
             </p>
             <h2 className="text-2xl font-semibold text-slate-950">
-              狩猟記録をそのまま転記用データに整理
+              狩猟・射撃の記録を転記用データに整理
             </h2>
             <p className="max-w-2xl text-sm leading-7 text-slate-600">
               日付、猟法、対象鳥獣、道具をまとめて記録し、報告書へ転記したかどうかを
@@ -90,7 +90,7 @@ export default async function ReportsPage({
             </div>
             <div className="rounded-[24px] bg-slate-100 p-4">
               <p className="text-xs font-semibold tracking-[0.16em] text-slate-500 uppercase">
-                狩猟記録
+                活動記録
               </p>
               <p className="mt-2 text-3xl font-semibold text-slate-950">
                 {huntingEvents.length} 件
@@ -109,7 +109,7 @@ export default async function ReportsPage({
             <p className="text-[11px] font-semibold tracking-[0.22em] text-slate-500 uppercase">
               新規登録
             </p>
-            <h3 className="mt-1 text-lg font-semibold">狩猟記録を追加</h3>
+            <h3 className="mt-1 text-lg font-semibold">活動記録を追加</h3>
           </div>
 
           <div className="report-form-grid grid grid-cols-1 gap-3 lg:grid-cols-4">
@@ -242,7 +242,7 @@ export default async function ReportsPage({
         <section className="grid gap-4">
           {huntingEvents.length === 0 ? (
             <div className="rounded-[30px] border border-dashed border-emerald-950/15 bg-white/72 p-6 text-sm leading-7 text-slate-600">
-              狩猟記録はまだありません。出猟日・猟法・場所・対象鳥獣を登録すると、報告書への転記内容を確認できます。
+              活動記録はまだありません。実施日・猟法・場所・対象鳥獣を登録すると、報告書への転記内容を確認できます。
             </div>
           ) : (
             huntingEvents.map((event) => {

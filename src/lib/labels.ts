@@ -126,8 +126,8 @@ export const appNavigationItems = [
   {
     href: "/reports",
     shortLabel: "報告",
-    label: "報告書転記",
-    description: "狩猟記録から転記内容を確認します。",
+    label: "活動記録",
+    description: "活動記録を整理します。",
   },
   {
     href: "/account",
