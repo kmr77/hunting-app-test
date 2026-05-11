@@ -1,6 +1,7 @@
 import {
   AmmoCategory,
   AmmoRecordType,
+  ActivityType,
   FirearmStatus,
   FirearmBarrelType,
   FirearmType,
@@ -200,6 +201,8 @@ export async function getDashboardSummary() {
       where: {
         userId: user.id,
         deletedAt: null,
+        activityType: ActivityType.HUNTING,
+        isReportTransferTarget: true,
         importedToReportAt: null,
       },
     }),
@@ -313,6 +316,7 @@ export async function getReportPageData() {
           },
           select: {
             id: true,
+            activityType: true,
             eventDate: true,
             prefectureCode: true,
             municipalityCode: true,
@@ -321,6 +325,10 @@ export async function getReportPageData() {
             targetSpecies: true,
             purposeCode: true,
             resultCount: true,
+            shootingType: true,
+            shootingRangeName: true,
+            shotCount: true,
+            isReportTransferTarget: true,
             notes: true,
             importedToReportAt: true,
             huntingEventTools: {
@@ -352,6 +360,7 @@ export async function getReportPageData() {
           where: {
             userId: user.id,
             deletedAt: null,
+            activityType: ActivityType.HUNTING,
             areaName: {
               not: null,
             },
@@ -464,6 +473,16 @@ export const huntingToolTypeOptions = [
   HuntingToolType.DOG,
   HuntingToolType.VEHICLE,
   HuntingToolType.OTHER,
+];
+
+export const activityTypeOptions = [ActivityType.HUNTING, ActivityType.SHOOTING];
+
+export const shootingTypeOptions = [
+  "標的射撃",
+  "射撃練習",
+  "試射",
+  "技能講習練習",
+  "その他",
 ];
 
 export const userStatusOptions = [

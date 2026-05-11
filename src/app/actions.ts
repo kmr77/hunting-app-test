@@ -4,6 +4,7 @@ import {
   AmmoCategory,
   AmmoRecordType,
   AmmoUnit,
+  ActivityType,
   FileCategory,
   FirearmBarrelType,
   FirearmStatus,
@@ -1075,12 +1076,27 @@ export async function deleteAmmoAction(formData: FormData) {
 export async function upsertHuntingEventAction(formData: FormData) {
   const pathname = "/reports";
   const id = getOptionalString(formData, "id");
+  const activityTypeInput = getOptionalString(formData, "activityType") as
+    | ActivityType
+    | null;
+  const activityType =
+    activityTypeInput === ActivityType.SHOOTING
+      ? ActivityType.SHOOTING
+      : ActivityType.HUNTING;
   const eventDate = getOptionalDate(formData, "eventDate");
-  const targetSpecies = getString(formData, "targetSpecies");
+  const targetSpecies = getOptionalString(formData, "targetSpecies");
   const resultCountValue = getOptionalString(formData, "resultCount");
   const resultCount = resultCountValue ? getInt(formData, "resultCount") : null;
   const toolQuantityValue = getOptionalString(formData, "toolQuantity");
   const toolQuantity = toolQuantityValue ? getInt(formData, "toolQuantity") : null;
+  const shootingType = getOptionalString(formData, "shootingType");
+  const shootingRangeName = getOptionalNormalizedText(
+    formData,
+    "shootingRangeName",
+  );
+  const shotCountValue = getOptionalString(formData, "shotCount");
+  const shotCount = shotCountValue ? getInt(formData, "shotCount") : null;
+  const toolName = getOptionalString(formData, "toolName");
 
   if (!isValidDate(eventDate)) {
     redirectWithMessage(pathname, "error", "保存に失敗しました。");
@@ -1088,7 +1104,7 @@ export async function upsertHuntingEventAction(formData: FormData) {
 
   const safeEventDate = eventDate as Date;
 
-  if (!targetSpecies) {
+  if (activityType === ActivityType.HUNTING && !targetSpecies) {
     redirectWithMessage(pathname, "error", "保存に失敗しました。");
   }
 
@@ -1100,23 +1116,58 @@ export async function upsertHuntingEventAction(formData: FormData) {
     redirectWithMessage(pathname, "error", "保存に失敗しました。");
   }
 
-  const payload = {
-    eventDate: safeEventDate,
-    prefectureCode: getOptionalString(formData, "prefectureCode"),
-    municipalityCode: null,
-    areaName: normalizeMunicipalityName(getOptionalString(formData, "areaName")),
-    huntingMethod: getOptionalString(formData, "huntingMethod") as
-      | HuntingMethod
-      | null,
-    targetSpecies,
-    purposeCode: getOptionalString(formData, "purposeCode") as
-      | HuntingPurpose
-      | null,
-    resultCount,
-    notes: getOptionalString(formData, "notes"),
-  };
+  if (shotCount !== null && shotCount < 0) {
+    redirectWithMessage(pathname, "error", "保存に失敗しました。");
+  }
 
-  const toolName = getOptionalString(formData, "toolName");
+  if (
+    activityType === ActivityType.SHOOTING &&
+    (!shootingType || !shootingRangeName || shotCount === null || !toolName)
+  ) {
+    redirectWithMessage(pathname, "error", "保存に失敗しました。");
+  }
+
+  const payload =
+    activityType === ActivityType.SHOOTING
+      ? {
+          activityType,
+          eventDate: safeEventDate,
+          prefectureCode: null,
+          municipalityCode: null,
+          areaName: null,
+          huntingMethod: null,
+          targetSpecies: null,
+          purposeCode: null,
+          resultCount: null,
+          shootingType,
+          shootingRangeName,
+          shotCount,
+          isReportTransferTarget: false,
+          importedToReportAt: null,
+          notes: getOptionalString(formData, "notes"),
+        }
+      : {
+          activityType,
+          eventDate: safeEventDate,
+          prefectureCode: getOptionalString(formData, "prefectureCode"),
+          municipalityCode: null,
+          areaName: normalizeMunicipalityName(
+            getOptionalString(formData, "areaName"),
+          ),
+          huntingMethod: getOptionalString(formData, "huntingMethod") as
+            | HuntingMethod
+            | null,
+          targetSpecies,
+          purposeCode: getOptionalString(formData, "purposeCode") as
+            | HuntingPurpose
+            | null,
+          resultCount,
+          shootingType: null,
+          shootingRangeName: null,
+          shotCount: null,
+          isReportTransferTarget: true,
+          notes: getOptionalString(formData, "notes"),
+        };
 
   try {
     const user = await getCurrentUser();
@@ -1151,7 +1202,8 @@ export async function upsertHuntingEventAction(formData: FormData) {
                 (getOptionalString(formData, "toolType") as HuntingToolType) ??
                 HuntingToolType.FIREARM,
               toolName,
-              quantity: toolQuantity,
+              quantity:
+                activityType === ActivityType.SHOOTING ? null : toolQuantity,
               notes: getOptionalString(formData, "toolNotes"),
             },
           }),
@@ -1176,7 +1228,8 @@ export async function upsertHuntingEventAction(formData: FormData) {
                 (getOptionalString(formData, "toolType") as HuntingToolType) ??
                 HuntingToolType.FIREARM,
               toolName,
-              quantity: toolQuantity,
+              quantity:
+                activityType === ActivityType.SHOOTING ? null : toolQuantity,
               notes: getOptionalString(formData, "toolNotes"),
             },
           }),
@@ -1244,6 +1297,27 @@ export async function toggleImportedToReportAction(formData: FormData) {
   try {
     const user = await getCurrentUser();
     await requireHuntingEvent(id, user.id);
+
+    const target = await withPrismaRetry((prisma) =>
+      prisma.huntingEvent.findFirst({
+        where: {
+          id,
+          userId: user.id,
+          activityType: ActivityType.HUNTING,
+          isReportTransferTarget: true,
+          deletedAt: null,
+        },
+        select: { id: true },
+      }),
+    );
+
+    if (!target) {
+      redirectWithMessage(
+        pathname,
+        "error",
+        "転記対象の狩猟記録が見つかりません。",
+      );
+    }
 
     await withPrismaRetry((prisma) =>
       prisma.huntingEvent.update({

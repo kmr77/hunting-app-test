@@ -4,6 +4,7 @@ import {
   FirearmStatus,
   FirearmBarrelType,
   FirearmType,
+  ActivityType,
   HuntingMethod,
   HuntingPurpose,
   HuntingToolType,
@@ -64,6 +65,11 @@ export const huntingToolTypeLabels: Record<HuntingToolType, string> = {
   DOG: "猟犬",
   VEHICLE: "車両",
   OTHER: "その他",
+};
+
+export const activityTypeLabels: Record<ActivityType, string> = {
+  HUNTING: "狩猟記録",
+  SHOOTING: "射撃記録",
 };
 
 export const userStatusLabels: Record<UserStatus, string> = {

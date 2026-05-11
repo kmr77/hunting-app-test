@@ -105,6 +105,11 @@ enum HuntingToolType {
   OTHER
 }
 
+enum ActivityType {
+  HUNTING
+  SHOOTING
+}
+
 enum ValidationRuleGroup {
   RENEWAL
   AMMO
@@ -375,6 +380,7 @@ model AmmoRecord {
 model HuntingEvent {
   id               String          @id @default(cuid())
   userId           String
+  activityType     ActivityType    @default(HUNTING)
   eventDate        DateTime
   prefectureCode   String?
   municipalityCode String?
@@ -383,6 +389,10 @@ model HuntingEvent {
   targetSpecies    String?
   purposeCode      HuntingPurpose?
   resultCount      Int?
+  shootingType     String?
+  shootingRangeName String?
+  shotCount        Int?
+  isReportTransferTarget Boolean   @default(true)
   notes            String?
   importedToReportAt DateTime?
   createdAt        DateTime        @default(now())
@@ -394,16 +404,20 @@ model HuntingEvent {
   huntingEventTools HuntingEventTool[]
 
   @@index([userId])
+  @@index([activityType])
   @@index([eventDate])
   @@index([prefectureCode])
   @@index([municipalityCode])
   @@index([huntingMethod])
   @@index([purposeCode])
+  @@index([isReportTransferTarget])
   @@index([importedToReportAt])
   @@index([deletedAt])
   @@index([userId, deletedAt])
   @@index([userId, eventDate, deletedAt])
+  @@index([userId, activityType, deletedAt])
   @@index([userId, purposeCode, eventDate, deletedAt])
+  @@index([userId, isReportTransferTarget, importedToReportAt, deletedAt])
   @@index([prefectureCode, municipalityCode, eventDate, deletedAt])
   @@map("hunting_events")
 }

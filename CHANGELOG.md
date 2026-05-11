@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## 2026-05-11
+
+### Changed
+- 活動記録に `activityType` を追加し、狩猟記録 / 射撃記録を分けて保存・表示できるように変更。
+- 射撃記録では射撃種別、射撃場、使用銃、使用弾数、メモを入力し、報告書転記対象に含めないように変更。
+- ダッシュボードと活動記録の未転記件数を、狩猟記録かつ転記対象の記録だけで集計するように変更。
+
+### Verified
+- `nodebrew exec v20.20.2 -- npm run prisma:generate` 成功。
+- `nodebrew exec v20.20.2 -- npm run prisma:push` 成功。
+- `nodebrew exec v20.20.2 -- npm run typecheck` 成功。
+- `nodebrew exec v20.20.2 -- npm run build` 成功。
+- `/reports` のHTTP 200表示と、狩猟記録 / 射撃記録のServer Action保存成功を確認。
+
+## 2026-05-10
+
+### Added
+- 活動記録の狩猟/射撃記録分離について設計メモを追加。
+
 ## 2026-05-01
 
 ### Added
