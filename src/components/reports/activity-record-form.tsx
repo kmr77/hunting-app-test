@@ -64,11 +64,17 @@ export function ActivityRecordForm({
     ActivityType.HUNTING,
   );
   const isHunting = activityType === ActivityType.HUNTING;
+  const formToneClass = isHunting
+    ? "border-emerald-900/15 bg-emerald-50/80"
+    : "border-sky-900/15 bg-sky-50/85";
+  const innerToneClass = isHunting
+    ? "border-emerald-950/10 bg-white/88"
+    : "border-sky-950/10 bg-white/88";
 
   return (
     <form
       action={upsertHuntingEventAction}
-      className="rounded-[30px] border border-emerald-950/10 bg-white/92 p-5 shadow-[0_24px_50px_-36px_rgba(15,23,42,0.38)]"
+      className={`rounded-[30px] border p-5 shadow-[0_24px_50px_-36px_rgba(15,23,42,0.38)] transition-colors ${formToneClass}`}
     >
       <div className="mb-4">
         <p className="text-[11px] font-semibold tracking-[0.22em] text-slate-500 uppercase">
@@ -77,32 +83,37 @@ export function ActivityRecordForm({
         <h3 className="mt-1 text-lg font-semibold">活動記録を追加</h3>
       </div>
 
-      <div className="mb-4 grid gap-2 sm:grid-cols-2">
+      <div
+        role="tablist"
+        aria-label="活動記録の種別"
+        className="mb-5 grid rounded-[24px] border border-white/80 bg-white/70 p-1.5 shadow-inner sm:grid-cols-2"
+      >
         {activityTypeOptions.map((option) => (
-          <label
+          <button
             key={option}
-            className={`flex cursor-pointer items-center justify-between rounded-[22px] border px-4 py-3 text-sm font-semibold transition-colors ${
+            type="button"
+            role="tab"
+            aria-selected={activityType === option}
+            onClick={() => setActivityType(option)}
+            className={`min-h-12 rounded-[20px] px-4 py-3 text-center text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
               activityType === option
-                ? "border-emerald-900 bg-emerald-950 !text-white"
-                : "border-slate-200 bg-slate-50 text-slate-700"
+                ? option === ActivityType.HUNTING
+                  ? "bg-emerald-950 !text-white shadow-[0_14px_28px_-22px_rgba(6,78,59,0.9)] focus-visible:outline-emerald-950"
+                  : "bg-sky-900 !text-white shadow-[0_14px_28px_-22px_rgba(12,74,110,0.9)] focus-visible:outline-sky-900"
+                : "text-slate-600 hover:bg-white hover:text-slate-950"
             }`}
           >
-            <span>{activityTypeLabels[option]}</span>
-            <input
-              type="radio"
-              name="activityType"
-              value={option}
-              checked={activityType === option}
-              onChange={() => setActivityType(option)}
-              className="h-4 w-4"
-            />
-          </label>
+            {activityTypeLabels[option]}
+          </button>
         ))}
       </div>
+      <input type="hidden" name="activityType" value={activityType} />
 
       {isHunting ? (
         <>
-          <div className="report-form-grid grid grid-cols-1 gap-3 lg:grid-cols-4">
+          <div
+            className={`report-form-grid grid grid-cols-1 gap-3 rounded-[26px] border p-4 lg:grid-cols-4 ${innerToneClass}`}
+          >
             <label className={formFieldLabel}>
               <span className={formLabelText}>実施日</span>
               <DateInput
@@ -180,7 +191,7 @@ export function ActivityRecordForm({
             </label>
           </div>
 
-          <div className="mt-5 rounded-[24px] bg-emerald-50/70 p-4">
+          <div className="mt-5 rounded-[24px] border border-emerald-950/10 bg-white/78 p-4">
             <div className="mb-3">
               <p className="text-sm font-semibold text-slate-900">
                 使用道具 1件
@@ -222,7 +233,9 @@ export function ActivityRecordForm({
           </div>
         </>
       ) : (
-        <div className="report-form-grid grid grid-cols-1 gap-3 lg:grid-cols-4">
+        <div
+          className={`report-form-grid grid grid-cols-1 gap-3 rounded-[26px] border p-4 lg:grid-cols-4 ${innerToneClass}`}
+        >
           <label className={formFieldLabel}>
             <span className={formLabelText}>実施日</span>
             <DateInput name="eventDate" required className={formFieldBase} />

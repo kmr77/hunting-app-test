@@ -150,7 +150,7 @@ export function FirearmBarrelFields() {
             { id: Date.now() + currentRows.length },
           ])
         }
-        className="mt-4 min-h-11 rounded-full bg-emerald-950 px-5 text-sm font-semibold !text-white"
+        className="mt-4 min-h-11 rounded-full bg-[#34C759] px-5 text-sm font-bold !text-white transition-colors hover:bg-[#28A745]"
       >
         + 銃身を追加
       </button>

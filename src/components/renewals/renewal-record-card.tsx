@@ -90,7 +90,7 @@ function FieldGrid({ items }: { items: Item[] }) {
 function Actions({ onCancel }: { onCancel: () => void }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row">
-      <button className="min-h-11 rounded-full bg-emerald-950 px-5 text-sm font-semibold !text-white">
+      <button className="min-h-11 rounded-full bg-[#34C759] px-5 text-sm font-bold !text-white transition-colors hover:bg-[#28A745]">
         保存
       </button>
       <button
