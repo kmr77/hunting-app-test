@@ -32,11 +32,13 @@ const firearmStatusOptions = ["ACTIVE", "DISPOSED", "INACTIVE"] as const;
 
 export function RenewalCreateForm({
   renewalRuleConfigs,
+  userBirthDate,
 }: {
   renewalRuleConfigs: Record<
     "HUNTING_LICENSE" | "GUN_LICENSE",
     RenewalRuleConfig
   >;
+  userBirthDate: string;
 }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -81,7 +83,8 @@ export function RenewalCreateForm({
         <p className="text-[11px] font-semibold tracking-[0.22em] text-slate-500 uppercase">新規登録</p>
         <h3 className="mt-1 text-lg font-semibold">免許・許可情報を追加</h3>
         <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-          狩猟免許または銃砲所持許可に記載されている交付日・有効期限日を入力すると、更新予定日や通知開始目安を自動表示します。
+          銃砲所持許可は、許可日と利用者設定の生年月日から有効期限日を自動計算します。
+          狩猟免許（狩猟免状）は、交付日から有効期限日を自動計算します。
         </p>
       </div>
 
@@ -97,7 +100,9 @@ export function RenewalCreateForm({
 
         <RenewalFactFields
           renewalRuleConfigs={renewalRuleConfigs}
-          gunPermitFields={<GunPermitFields />}
+          userBirthDate={userBirthDate}
+          errors={fieldErrors}
+          gunPermitFields={() => <GunPermitFields errors={fieldErrors} />}
           gunFields={<GunFields errors={fieldErrors} />}
         />
 

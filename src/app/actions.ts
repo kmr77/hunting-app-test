@@ -35,6 +35,10 @@ import {
   toHalfWidthAlnum,
 } from "@/lib/normalize";
 import { savePermitImage, deletePermitImage } from "@/lib/permit-storage";
+import {
+  calculateGunLicenseExpiresOn,
+  calculateHuntingLicenseExpiresOn,
+} from "@/lib/format";
 
 export type FieldErrors = Record<string, string>;
 export type RenewalActionResult =
@@ -128,7 +132,70 @@ function normalizeMunicipalityName(value: string | null) {
 
 function getOptionalDate(formData: FormData, key: string) {
   const value = getOptionalString(formData, key);
-  return value ? new Date(value) : null;
+  return value ? parseDateInputValue(value) : null;
+}
+
+function parseDateInputValue(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const match = value.match(/^(\d{4})(\d{2})(\d{2})$/) ??
+    value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return null;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return date;
+}
+
+function getDateInputError(
+  formData: FormData,
+  key: string,
+  label: string,
+  required = false,
+) {
+  const value = getOptionalString(formData, key);
+  if (!value) {
+    return required ? `${label}を半角数字8桁で入力してください。` : null;
+  }
+
+  if (!/^\d{8}$/.test(value) && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return `${label}は半角数字8桁で入力してください。`;
+  }
+
+  if (!parseDateInputValue(value)) {
+    return `${label}は存在する日付を入力してください。`;
+  }
+
+  return null;
+}
+
+function normalizePhoneNumber(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value
+    .replace(/[０-９]/g, (char) =>
+      String.fromCharCode(char.charCodeAt(0) - 0xfee0),
+    )
+    .replace(/[\s\u3000-]/g, "")
+    .trim();
+
+  return normalized.length > 0 ? normalized : null;
 }
 
 function subtractDays(date: Date, days: number) {
@@ -142,7 +209,7 @@ function getGeneratedRenewalTitle(category: RenewalCategory) {
     return "銃砲所持許可 更新管理";
   }
 
-  return "狩猟免許 更新管理";
+  return "狩猟免許（狩猟免状） 更新管理";
 }
 
 function getInt(formData: FormData, key: string) {
@@ -163,6 +230,21 @@ function redirectWithMessage(
   const params = new URLSearchParams({
     status: variant,
     message,
+  });
+
+  redirect(`${pathname}?${params.toString()}`);
+}
+
+function redirectWithFieldMessage(
+  pathname: string,
+  variant: "success" | "error",
+  message: string,
+  field: string,
+): never {
+  const params = new URLSearchParams({
+    status: variant,
+    message,
+    field,
   });
 
   redirect(`${pathname}?${params.toString()}`);
@@ -271,15 +353,29 @@ export async function upsertRenewalAction(
 ): Promise<RenewalActionResult> {
   const id = getOptionalString(formData, "id");
   const category = getString(formData, "category") as RenewalCategory;
-  const expiresOn = getOptionalDate(formData, "expiresOn");
+  const issuedOn = getOptionalDate(formData, "issuedOn");
+  const originalPermittedOn = getOptionalDate(formData, "originalPermittedOn");
 
   const errors: FieldErrors = {};
   if (!category) {
     errors.category = "種別を選択してください。";
   }
 
-  if (!isValidDate(expiresOn)) {
-    errors.expiresOn = "有効期限日を入力してください。";
+  const dateErrors = [
+    ["issuedOn", "交付日", true],
+    ["originalPermittedOn", "許可日", category === RenewalCategory.GUN_LICENSE],
+    ["confirmedOn", "確認日", false],
+    ["applicationStartOn", "更新申請期間開始日", false],
+    ["applicationEndOn", "更新申請期間終了日", false],
+    ["firearmPermittedOn", "銃本体の許可日", false],
+    ["firearmExpiresOn", "銃本体の有効期限日", false],
+  ] as const;
+
+  for (const [key, label, required] of dateErrors) {
+    const error = getDateInputError(formData, key, label, required);
+    if (error) {
+      errors[key] = error;
+    }
   }
 
   const originalPermitRaw = getOptionalString(formData, "originalPermitNumber");
@@ -299,6 +395,60 @@ export async function upsertRenewalAction(
     return { success: false, errors };
   }
 
+  let user;
+  try {
+    user = await getCurrentUser();
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "利用者情報の取得に失敗しました。",
+    };
+  }
+
+  let expiresOn: Date | null = null;
+  if (category === RenewalCategory.GUN_LICENSE) {
+    if (!user.profile?.birthDate) {
+      errors.expiresOn =
+        "銃砲所持許可の有効期限日を計算するため、利用者設定で生年月日を入力してください。";
+    }
+
+    if (!originalPermittedOn) {
+      errors.originalPermittedOn =
+        errors.originalPermittedOn ?? "許可日を半角数字8桁で入力してください。";
+    }
+
+    const calculatedExpiresOn = calculateGunLicenseExpiresOn(
+      user.profile?.birthDate,
+      originalPermittedOn,
+    );
+    expiresOn = calculatedExpiresOn
+      ? parseDateInputValue(calculatedExpiresOn)
+      : null;
+
+    if (!expiresOn) {
+      errors.expiresOn =
+        errors.expiresOn ??
+        "許可日と生年月日から有効期限日を計算できませんでした。";
+    }
+  } else if (category === RenewalCategory.HUNTING_LICENSE) {
+    const calculatedExpiresOn = calculateHuntingLicenseExpiresOn(issuedOn);
+    expiresOn = calculatedExpiresOn
+      ? parseDateInputValue(calculatedExpiresOn)
+      : null;
+
+    if (!expiresOn) {
+      errors.expiresOn =
+        "交付日から狩猟免許（狩猟免状）の有効期限日を計算できませんでした。";
+    }
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return { success: false, errors };
+  }
+
   const renewalRuleConfig = await resolveRenewalRule("COMMON", category);
   const targetDate = expiresOn;
   const reminderStartOn = targetDate
@@ -310,22 +460,21 @@ export async function upsertRenewalAction(
     title: getGeneratedRenewalTitle(category),
     jurisdictionCode: getOptionalString(formData, "jurisdictionCode"),
     targetDate,
-    issuedOn: getOptionalDate(formData, "issuedOn"),
+    issuedOn,
     expiresOn,
     reminderStartOn,
-    originalPermittedOn: getOptionalDate(formData, "originalPermittedOn"),
+    originalPermittedOn,
     originalPermitNumber: getOptionalPermitNumber(formData, "originalPermitNumber"),
     permitNumber: getOptionalPermitNumber(formData, "permitNumber"),
     confirmedOn: getOptionalDate(formData, "confirmedOn"),
     applicationStartOn: getOptionalDate(formData, "applicationStartOn"),
     applicationEndOn: getOptionalDate(formData, "applicationEndOn"),
     validityDescription: getOptionalNormalizedText(formData, "validityDescription"),
-    status: getString(formData, "status") as RenewalStatus,
+    status: (getOptionalString(formData, "status") as RenewalStatus) ?? RenewalStatus.ACTIVE,
     notes: getOptionalNormalizedText(formData, "notes"),
   };
 
   try {
-    const user = await getCurrentUser();
     if (id) {
       await requireRenewalRecord(id, user.id);
       await withPrismaRetry((prisma) =>
@@ -441,15 +590,26 @@ export async function updateRenewalPermitInfoAction(
 ): Promise<RenewalActionResult> {
   const pathname = "/renewals";
   const id = getString(formData, "id");
-  const expiresOn = getOptionalDate(formData, "expiresOn");
+  const originalPermittedOn = getOptionalDate(formData, "originalPermittedOn");
   const errors: FieldErrors = {};
 
   if (!id) {
     redirectWithMessage(pathname, "error", "更新に失敗しました。");
   }
 
-  if (!isValidDate(expiresOn)) {
-    errors.expiresOn = "有効期限日を入力してください。";
+  const dateErrors = [
+    ["issuedOn", "交付日", false],
+    ["originalPermittedOn", "許可日", true],
+    ["confirmedOn", "確認日", false],
+    ["applicationStartOn", "更新申請期間開始日", false],
+    ["applicationEndOn", "更新申請期間終了日", false],
+  ] as const;
+
+  for (const [key, label, required] of dateErrors) {
+    const error = getDateInputError(formData, key, label, required);
+    if (error) {
+      errors[key] = error;
+    }
   }
 
   const originalPermitRaw = getOptionalString(formData, "originalPermitNumber");
@@ -473,6 +633,38 @@ export async function updateRenewalPermitInfoAction(
     const user = await getCurrentUser();
     const renewal = await requireRenewalRecord(id, user.id);
     const category = renewal.category;
+    if (category !== RenewalCategory.GUN_LICENSE) {
+      throw new Error("銃砲所持許可の記録ではありません。");
+    }
+
+    if (!user.profile?.birthDate) {
+      return {
+        success: false,
+        errors: {
+          expiresOn:
+            "銃砲所持許可の有効期限日を計算するため、利用者設定で生年月日を入力してください。",
+        },
+      };
+    }
+
+    const calculatedExpiresOn = calculateGunLicenseExpiresOn(
+      user.profile.birthDate,
+      originalPermittedOn,
+    );
+    const expiresOn = calculatedExpiresOn
+      ? parseDateInputValue(calculatedExpiresOn)
+      : null;
+
+    if (!expiresOn) {
+      return {
+        success: false,
+        errors: {
+          originalPermittedOn:
+            "許可日と生年月日から有効期限日を計算できませんでした。",
+        },
+      };
+    }
+
     const renewalRuleConfig = await resolveRenewalRule("COMMON", category);
     const reminderStartOn = expiresOn
       ? subtractDays(expiresOn, renewalRuleConfig.reminderLeadDays)
@@ -495,7 +687,9 @@ export async function updateRenewalPermitInfoAction(
           applicationStartOn: getOptionalDate(formData, "applicationStartOn"),
           applicationEndOn: getOptionalDate(formData, "applicationEndOn"),
           validityDescription: getOptionalNormalizedText(formData, "validityDescription"),
-          status: getString(formData, "status") as RenewalStatus,
+          status:
+            (getOptionalString(formData, "status") as RenewalStatus) ??
+            RenewalStatus.ACTIVE,
           notes: getOptionalNormalizedText(formData, "notes"),
         },
       }),
@@ -511,6 +705,87 @@ export async function updateRenewalPermitInfoAction(
   }
 
   revalidateAppPaths("/", "/renewals");
+  return { success: true };
+}
+
+export async function updateHuntingLicenseInfoAction(
+  prevState: RenewalActionResult | null,
+  formData: FormData,
+): Promise<RenewalActionResult> {
+  const pathname = "/renewals";
+  const id = getString(formData, "id");
+  const issuedOn = getOptionalDate(formData, "issuedOn");
+  const errors: FieldErrors = {};
+
+  if (!id) {
+    redirectWithMessage(pathname, "error", "更新に失敗しました。");
+  }
+
+  const issuedOnError = getDateInputError(formData, "issuedOn", "交付日", true);
+  if (issuedOnError) {
+    errors.issuedOn = issuedOnError;
+  }
+
+  const calculatedExpiresOn = calculateHuntingLicenseExpiresOn(issuedOn);
+  const expiresOn = calculatedExpiresOn
+    ? parseDateInputValue(calculatedExpiresOn)
+    : null;
+
+  if (!expiresOn) {
+    errors.expiresOn =
+      "交付日から狩猟免許（狩猟免状）の有効期限日を計算できませんでした。";
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return { success: false, errors };
+  }
+
+  const safeExpiresOn = expiresOn as Date;
+
+  try {
+    const user = await getCurrentUser();
+    const renewal = await requireRenewalRecord(id, user.id);
+    if (renewal.category !== RenewalCategory.HUNTING_LICENSE) {
+      throw new Error("狩猟免許（狩猟免状）の記録ではありません。");
+    }
+
+    const renewalRuleConfig = await resolveRenewalRule(
+      "COMMON",
+      RenewalCategory.HUNTING_LICENSE,
+    );
+    const reminderStartOn = subtractDays(
+      safeExpiresOn,
+      renewalRuleConfig.reminderLeadDays,
+    );
+
+    await withPrismaRetry((prisma) =>
+      prisma.renewalRecord.update({
+        where: { id },
+        data: {
+          category: RenewalCategory.HUNTING_LICENSE,
+          title: getGeneratedRenewalTitle(RenewalCategory.HUNTING_LICENSE),
+          issuedOn,
+          expiresOn: safeExpiresOn,
+          targetDate: safeExpiresOn,
+          reminderStartOn,
+          status:
+            (getOptionalString(formData, "status") as RenewalStatus) ??
+            RenewalStatus.ACTIVE,
+          notes: getOptionalNormalizedText(formData, "notes"),
+        },
+      }),
+    );
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "狩猟免許（狩猟免状）の更新に失敗しました。",
+    };
+  }
+
+  revalidateAppPaths("/", "/renewals", "/account");
   return { success: true };
 }
 
@@ -532,17 +807,15 @@ export async function updateFirearmRecordAction(
     errors.serialNumber = "銃番号を正しく入力してください。";
   }
 
-  const permittedOnRaw = getOptionalString(formData, "firearmPermittedOn");
-  const expiresOnRaw = getOptionalString(formData, "firearmExpiresOn");
-  const permittedOn = permittedOnRaw ? new Date(permittedOnRaw) : null;
-  const expiresOn = expiresOnRaw ? new Date(expiresOnRaw) : null;
-
-  if (permittedOnRaw && !isValidDate(permittedOn)) {
-    errors.firearmPermittedOn = "許可日を正しく入力してください。";
+  const permittedOn = getOptionalDate(formData, "firearmPermittedOn");
+  const expiresOn = getOptionalDate(formData, "firearmExpiresOn");
+  const permittedOnError = getDateInputError(formData, "firearmPermittedOn", "許可日");
+  const expiresOnError = getDateInputError(formData, "firearmExpiresOn", "有効期限日");
+  if (permittedOnError) {
+    errors.firearmPermittedOn = permittedOnError;
   }
-
-  if (expiresOnRaw && !isValidDate(expiresOn)) {
-    errors.firearmExpiresOn = "有効期限日を正しく入力してください。";
+  if (expiresOnError) {
+    errors.firearmExpiresOn = expiresOnError;
   }
 
   if (Object.keys(errors).length > 0) {
@@ -1359,6 +1632,23 @@ export async function updateAccountAction(formData: FormData) {
     redirectWithMessage(pathname, "error", "姓名を入力してください。");
   }
 
+  const birthDateError = getDateInputError(formData, "birthDate", "生年月日");
+  if (birthDateError) {
+    redirectWithFieldMessage(pathname, "error", birthDateError, "birthDate");
+  }
+
+  const normalizedPhoneNumber = normalizePhoneNumber(
+    getOptionalString(formData, "phoneNumber"),
+  );
+  if (normalizedPhoneNumber && !/^\d+$/.test(normalizedPhoneNumber)) {
+    redirectWithFieldMessage(
+      pathname,
+      "error",
+      "電話番号はハイフンなしの半角数字で入力してください。",
+      "phoneNumber",
+    );
+  }
+
   try {
     const user = await getCurrentUser();
     const profile = user.profile;
@@ -1383,7 +1673,7 @@ export async function updateAccountAction(formData: FormData) {
             firstName,
             birthDate:
               getOptionalDate(formData, "birthDate") ?? profile.birthDate,
-            phoneNumber: getOptionalString(formData, "phoneNumber"),
+            phoneNumber: normalizedPhoneNumber,
             prefectureCode: getOptionalString(formData, "prefectureCode"),
             addressLine1: getOptionalString(formData, "addressLine1"),
             addressLine2: getOptionalString(formData, "addressLine2"),

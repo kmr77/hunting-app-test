@@ -20,7 +20,7 @@ import {
   getFeedbackFromSearchParams,
   type SearchParamsInput,
 } from "@/lib/feedback";
-import { formatDateInput, formatDateLabel } from "@/lib/format";
+import { formatDateInput, formatDateLabel, formatJapaneseEraDate } from "@/lib/format";
 import {
   firearmStatusLabels,
   firearmBarrelTypeLabels,
@@ -46,9 +46,13 @@ export default async function RenewalsPage({
     getRenewalPageDataFallback().renewalRuleConfigs as Awaited<
       ReturnType<typeof getRenewalPageData>
     >["renewalRuleConfigs"];
+  let userBirthDate = "";
 
   try {
-    ({ renewals, renewalRuleConfigs } = await getRenewalPageData());
+    const data = await getRenewalPageData();
+    renewals = data.renewals;
+    renewalRuleConfigs = data.renewalRuleConfigs;
+    userBirthDate = formatDateInput(data.user.profile?.birthDate);
   } catch (error) {
     feedback ??= {
       variant: "error",
@@ -72,7 +76,7 @@ export default async function RenewalsPage({
               許可や講習の期限をまとめて管理
             </h2>
             <p className="max-w-2xl text-sm leading-7 text-slate-600">
-              MVP では狩猟免許と銃砲所持許可の期限を記録します。
+              MVP では狩猟免許（狩猟免状）と銃砲所持許可の期限を記録します。
               新規登録時には銃本体と銃身情報を関連付けできます。
             </p>
           </div>
@@ -101,12 +105,15 @@ export default async function RenewalsPage({
       </section>
 
       <section className="grid gap-4">
-        <RenewalCreateForm renewalRuleConfigs={renewalRuleConfigs} />
+        <RenewalCreateForm
+          renewalRuleConfigs={renewalRuleConfigs}
+          userBirthDate={userBirthDate}
+        />
 
         <section className="grid gap-4">
           {renewals.length === 0 ? (
             <div className="rounded-[30px] border border-dashed border-emerald-950/15 bg-white/72 p-6 text-sm leading-7 text-slate-600">
-              免許・許可情報はまだ登録されていません。狩猟免許または銃砲所持許可の交付日・有効期限日を登録すると、更新予定日や通知開始目安を確認できます。
+              免許・許可情報はまだ登録されていません。狩猟免許（狩猟免状）は交付日、銃砲所持許可は許可日を登録すると、更新予定日や通知開始目安を確認できます。
             </div>
           ) : (
             renewals.map((renewal) => {
@@ -117,6 +124,7 @@ export default async function RenewalsPage({
                 renewal.category === RenewalCategory.GUN_LICENSE;
               const renewalCardData = {
                 id: renewal.id,
+                category: renewal.category,
                 status: renewal.status,
                 statusLabel: renewalStatusLabels[renewal.status],
                 issuedOn: formatDateInput(renewal.issuedOn),
@@ -183,7 +191,7 @@ export default async function RenewalsPage({
                           {renewal.title}
                         </h3>
                         <p className="text-sm text-slate-600">
-                          有効期限日 {formatDateLabel(renewal.expiresOn)}
+                          有効期限日 {formatJapaneseEraDate(renewal.expiresOn)}
                         </p>
                       </div>
                       <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-900">
@@ -191,7 +199,10 @@ export default async function RenewalsPage({
                       </span>
                     </div>
 
-                    <RenewalRecordCard renewal={renewalCardData} />
+                    <RenewalRecordCard
+                      renewal={renewalCardData}
+                      userBirthDate={userBirthDate}
+                    />
                   </div>
 
                 {canAttachPermitImage ? (

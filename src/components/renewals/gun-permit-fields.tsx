@@ -1,26 +1,25 @@
-"use client";
-
 import { DateInput } from "@/components/date-input";
+import { FieldError } from "@/components/field-error";
 import { formFieldCompact, formFieldLabel, formLabelText } from "@/lib/form-classes";
 
 type GunPermitFieldsProps = {
-  defaultOriginalPermittedOn?: string;
   defaultOriginalPermitNumber?: string | null;
   defaultPermitNumber?: string | null;
   defaultConfirmedOn?: string;
   defaultApplicationStartOn?: string;
   defaultApplicationEndOn?: string;
   defaultValidityDescription?: string | null;
+  errors?: Record<string, string>;
 };
 
 export function GunPermitFields({
-  defaultOriginalPermittedOn = "",
   defaultOriginalPermitNumber = "",
   defaultPermitNumber = "",
   defaultConfirmedOn = "",
   defaultApplicationStartOn = "",
   defaultApplicationEndOn = "",
   defaultValidityDescription = "",
+  errors = {},
 }: GunPermitFieldsProps) {
   return (
     <section className="lg:col-span-4 rounded-[24px] border border-emerald-950/10 bg-white/80 p-4">
@@ -33,15 +32,6 @@ export function GunPermitFields({
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
-        <label className={formFieldLabel}>
-          <span className={formLabelText}>原許可日</span>
-          <DateInput
-            name="originalPermittedOn"
-            defaultValue={defaultOriginalPermittedOn}
-            className={formFieldCompact}
-          />
-        </label>
-
         <label className={formFieldLabel}>
           <span className={formLabelText}>最初の許可番号</span>
           <span className="flex min-w-0 items-center rounded-[18px] border border-slate-200 bg-slate-50">
@@ -77,6 +67,7 @@ export function GunPermitFields({
             defaultValue={defaultConfirmedOn}
             className={formFieldCompact}
           />
+          <FieldError error={errors.confirmedOn} />
         </label>
 
         <label className={formFieldLabel}>
@@ -86,6 +77,7 @@ export function GunPermitFields({
             defaultValue={defaultApplicationStartOn}
             className={formFieldCompact}
           />
+          <FieldError error={errors.applicationStartOn} />
         </label>
 
         <label className={formFieldLabel}>
@@ -95,6 +87,7 @@ export function GunPermitFields({
             defaultValue={defaultApplicationEndOn}
             className={formFieldCompact}
           />
+          <FieldError error={errors.applicationEndOn} />
         </label>
 
         <label className={formFieldLabel + " lg:col-span-2"}>

@@ -2,11 +2,17 @@
 
 import { useActionState, useState } from "react";
 import {
+  calculateGunLicenseExpiresOn,
+  calculateHuntingLicenseExpiresOn,
+  formatJapaneseEraDate,
+} from "@/lib/format";
+import {
   createFirearmBarrelRecordAction,
   deleteFirearmBarrelRecordAction,
   deleteFirearmRecordAction,
   updateFirearmBarrelRecordAction,
   updateFirearmRecordAction,
+  updateHuntingLicenseInfoAction,
   updateRenewalPermitInfoAction,
 } from "@/app/actions";
 import { DateInput } from "@/components/date-input";
@@ -51,6 +57,7 @@ type Firearm = {
 };
 type Renewal = {
   id: string;
+  category: string;
   status: string;
   statusLabel: string;
   issuedOn?: string;
@@ -72,6 +79,10 @@ function display(value: string | null | undefined) {
 
 function permitNumber(value: string | null | undefined) {
   return value ? `第${value}号` : "未登録";
+}
+
+function displayDate(value: string | null | undefined) {
+  return value ? formatJapaneseEraDate(value) : "未登録";
 }
 
 function FieldGrid({ items }: { items: Item[] }) {
@@ -112,15 +123,118 @@ function Note() {
   );
 }
 
-export function RenewalRecordCard({ renewal }: { renewal: Renewal }) {
+export function RenewalRecordCard({
+  renewal,
+  userBirthDate,
+}: {
+  renewal: Renewal;
+  userBirthDate: string;
+}) {
   const [editing, setEditing] = useState<"permit" | "firearm" | string | null>(null);
+  const [permitOriginalPermittedOn, setPermitOriginalPermittedOn] = useState(
+    renewal.originalPermittedOn ?? "",
+  );
+  const [huntingIssuedOn, setHuntingIssuedOn] = useState(renewal.issuedOn ?? "");
+  const [huntingState, huntingAction] = useActionState(
+    updateHuntingLicenseInfoAction,
+    null,
+  );
   const [permitState, permitAction] = useActionState(updateRenewalPermitInfoAction, null);
   const [firearmState, firearmAction] = useActionState(updateFirearmRecordAction, null);
   const [barrelState, barrelAction] = useActionState(updateFirearmBarrelRecordAction, null);
   const firearm = renewal.firearmRecords[0];
+  const calculatedPermitExpiresOn = calculateGunLicenseExpiresOn(
+    userBirthDate,
+    permitOriginalPermittedOn,
+  );
+  const calculatedHuntingExpiresOn =
+    calculateHuntingLicenseExpiresOn(huntingIssuedOn);
+
+  function handlePermitOriginalPermittedOnChange(value: string) {
+    setPermitOriginalPermittedOn(value);
+  }
 
   return (
     <div className="grid gap-4">
+      {renewal.category === "HUNTING_LICENSE" ? (
+        <section className="rounded-[24px] border border-emerald-950/10 bg-white/80 p-4">
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">
+                狩猟免許（狩猟免状）情報
+              </p>
+              <p className="text-xs leading-6 text-slate-600">
+                交付日から有効期限日を自動計算します。
+              </p>
+            </div>
+            {editing !== "hunting" ? (
+              <button
+                type="button"
+                onClick={() => setEditing("hunting")}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
+              >
+                編集
+              </button>
+            ) : null}
+          </div>
+          {editing === "hunting" ? (
+            <form action={huntingAction} className="grid gap-3">
+              {huntingState && !huntingState.success && huntingState.errors ? (
+                <div className="rounded-[18px] border border-red-200 bg-red-50 p-3">
+                  <p className="text-sm font-semibold text-red-800">入力エラーがあります</p>
+                  <ul className="mt-2 list-disc list-inside text-sm text-red-700">
+                    {Object.entries(huntingState.errors).map(([key, message]) => (
+                      <li key={key}>{message as string}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              <input type="hidden" name="id" value={renewal.id} />
+              <input type="hidden" name="status" value={renewal.status} />
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+                <label className={formFieldLabel}>
+                  <span className={formLabelText}>交付日</span>
+                  <DateInput
+                    name="issuedOn"
+                    value={huntingIssuedOn}
+                    onChange={(event) => setHuntingIssuedOn(event.target.value)}
+                    className={formFieldCompact}
+                  />
+                </label>
+                <div className="min-w-0 space-y-1.5 rounded-[18px] border border-emerald-950/10 bg-emerald-50/70 p-3 text-sm">
+                  <span className={formLabelText}>有効期限日</span>
+                  <p className="font-semibold text-slate-950">
+                    {calculatedHuntingExpiresOn
+                      ? formatJapaneseEraDate(calculatedHuntingExpiresOn)
+                      : "交付日を入力すると自動表示されます"}
+                  </p>
+                  <p className="text-xs leading-5 text-slate-500">
+                    保存時に交付日の年 + 3年の9月14日として再計算します。
+                  </p>
+                </div>
+                <label className={formFieldLabel + " lg:col-span-4"}>
+                  <span className={formLabelText}>メモ</span>
+                  <textarea
+                    name="notes"
+                    rows={2}
+                    defaultValue={renewal.notes ?? ""}
+                    className={formTextareaCompact}
+                  />
+                </label>
+              </div>
+              <Actions onCancel={() => setEditing(null)} />
+            </form>
+          ) : (
+            <FieldGrid
+              items={[
+                { label: "交付日", value: displayDate(renewal.issuedOn) },
+                { label: "有効期限日", value: displayDate(renewal.expiresOn) },
+                { label: "メモ", value: renewal.notes },
+              ]}
+            />
+          )}
+        </section>
+      ) : (
       <section className="rounded-[24px] border border-emerald-950/10 bg-white/80 p-4">
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
@@ -152,12 +266,12 @@ export function RenewalRecordCard({ renewal }: { renewal: Renewal }) {
               </div>
             )}
             <input type="hidden" name="id" value={renewal.id} />
+            <input type="hidden" name="status" value={renewal.status} />
             <Note />
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
-              <label className={formFieldLabel}><span className={formLabelText}>進捗</span><select name="status" defaultValue={renewal.status} className={formFieldCompact}><option value="ACTIVE">管理中</option><option value="EXPIRED">要確認</option><option value="RENEWED">完了</option></select></label>
+              <label className={formFieldLabel}><span className={formLabelText}>許可日</span><DateInput name="originalPermittedOn" value={permitOriginalPermittedOn} onChange={(event) => handlePermitOriginalPermittedOnChange(event.target.value)} className={formFieldCompact} /></label>
               <label className={formFieldLabel}><span className={formLabelText}>交付日</span><DateInput name="issuedOn" defaultValue={renewal.issuedOn} className={formFieldCompact} /></label>
-              <label className={formFieldLabel}><span className={formLabelText}>有効期限日</span><DateInput name="expiresOn" defaultValue={renewal.expiresOn} required className={formFieldCompact} /></label>
-              <label className={formFieldLabel}><span className={formLabelText}>原許可日</span><DateInput name="originalPermittedOn" defaultValue={renewal.originalPermittedOn} className={formFieldCompact} /></label>
+              <div className="min-w-0 space-y-1.5 rounded-[18px] border border-emerald-950/10 bg-emerald-50/70 p-3 text-sm"><span className={formLabelText}>有効期限日</span><p className="font-semibold text-slate-950">{calculatedPermitExpiresOn ? formatJapaneseEraDate(calculatedPermitExpiresOn) : "許可日と生年月日を入力すると自動表示されます"}</p><p className="text-xs leading-5 text-slate-500">保存時に許可日と利用者本人の生年月日から再計算します。</p></div>
               <label className={formFieldLabel}><span className={formLabelText}>最初の許可番号</span><input name="originalPermitNumber" defaultValue={renewal.originalPermitNumber ?? ""} className={formFieldCompact} /></label>
               <label className={formFieldLabel}><span className={formLabelText}>今回の許可番号</span><input name="permitNumber" defaultValue={renewal.permitNumber ?? ""} className={formFieldCompact} /></label>
               <label className={formFieldLabel}><span className={formLabelText}>確認日</span><DateInput name="confirmedOn" defaultValue={renewal.confirmedOn} className={formFieldCompact} /></label>
@@ -171,20 +285,22 @@ export function RenewalRecordCard({ renewal }: { renewal: Renewal }) {
         ) : (
           <FieldGrid
             items={[
-              { label: "原許可日", value: renewal.originalPermittedOn },
+              { label: "許可日", value: displayDate(renewal.originalPermittedOn) },
               { label: "最初の許可番号", value: permitNumber(renewal.originalPermitNumber) },
               { label: "今回の許可番号", value: permitNumber(renewal.permitNumber) },
-              { label: "確認日", value: renewal.confirmedOn },
+              { label: "交付日", value: displayDate(renewal.issuedOn) },
+              { label: "有効期限日", value: displayDate(renewal.expiresOn) },
+              { label: "確認日", value: displayDate(renewal.confirmedOn) },
               { label: "有効期間", value: renewal.validityDescription },
-              { label: "更新申請期間開始日", value: renewal.applicationStartOn },
-              { label: "更新申請期間終了日", value: renewal.applicationEndOn },
-              { label: "進捗", value: renewal.statusLabel },
+              { label: "更新申請期間開始日", value: displayDate(renewal.applicationStartOn) },
+              { label: "更新申請期間終了日", value: displayDate(renewal.applicationEndOn) },
             ]}
           />
         )}
       </section>
+      )}
 
-      {firearm ? (
+      {renewal.category === "GUN_LICENSE" && firearm ? (
         <section className="rounded-[24px] bg-emerald-50/70 p-4">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>

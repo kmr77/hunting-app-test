@@ -1,5 +1,6 @@
 import { updateAccountAction } from "@/app/actions";
 import { FeedbackBanner } from "@/components/feedback-banner";
+import { FieldError } from "@/components/field-error";
 import { DateInput } from "@/components/date-input";
 import { formFieldBase, formFieldLabel, formLabelText } from "@/lib/form-classes";
 import { SubmitButton } from "@/components/submit-button";
@@ -25,6 +26,10 @@ export default async function AccountPage({
   searchParams?: Promise<SearchParamsInput>;
 }) {
   const searchFeedback = await getFeedbackFromSearchParams(await searchParams);
+  const rawSearchParams = (await searchParams) ?? {};
+  const fieldParam = Array.isArray(rawSearchParams.field)
+    ? rawSearchParams.field[0]
+    : rawSearchParams.field;
   let feedback = searchFeedback;
   let data: AccountPageData | null = null;
 
@@ -39,6 +44,7 @@ export default async function AccountPage({
 
   const profile = data?.profile;
   const fullName = `${profile?.lastName ?? ""}${profile?.firstName ?? ""}`.trim();
+  const phoneNumberInput = (profile?.phoneNumber ?? "").replace(/\D/g, "");
 
   return (
     <main className="flex flex-1 flex-col gap-5">
@@ -120,9 +126,21 @@ export default async function AccountPage({
               <span className={formLabelText}>電話番号</span>
               <input
                 name="phoneNumber"
-                defaultValue={profile?.phoneNumber ?? ""}
-                placeholder="例: 090-0000-0000"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                defaultValue={phoneNumberInput}
+                placeholder="例: 09012345678"
                 className={formFieldBase}
+              />
+              <span className="text-xs leading-5 text-slate-500">
+                例: 09012345678 のように、ハイフンなしの半角数字で入力してください。
+              </span>
+              <FieldError
+                error={
+                  fieldParam === "phoneNumber" && feedback?.variant === "error"
+                    ? feedback.message
+                    : undefined
+                }
               />
             </label>
 
@@ -132,6 +150,13 @@ export default async function AccountPage({
                 name="birthDate"
                 defaultValue={formatDateInput(profile?.birthDate)}
                 className={formFieldBase}
+              />
+              <FieldError
+                error={
+                  fieldParam === "birthDate" && feedback?.variant === "error"
+                    ? feedback.message
+                    : undefined
+                }
               />
             </label>
 

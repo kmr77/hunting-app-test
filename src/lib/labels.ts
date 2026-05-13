@@ -15,7 +15,7 @@ import {
 } from "@prisma/client";
 
 export const renewalCategoryLabels: Record<RenewalCategory, string> = {
-  HUNTING_LICENSE: "狩猟免許",
+  HUNTING_LICENSE: "狩猟免許（狩猟免状）",
   GUN_LICENSE: "銃砲所持許可",
   HUNTER_REGISTRATION: "狩猟者登録",
   SKILL_COURSE: "技能講習",
