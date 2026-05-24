@@ -44,12 +44,14 @@ export function RenewalCreateForm({
   const formRef = useRef<HTMLFormElement | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFieldErrors({});
     setFormError(null);
+    setSuccessMessage(null);
 
     const form = formRef.current;
     if (!form) {
@@ -69,9 +71,8 @@ export function RenewalCreateForm({
         return;
       }
 
-      router.push(
-        "/renewals?status=success&message=%E6%9B%B4%E6%96%B0%E8%A8%98%E9%8C%B2%E3%82%92%E7%99%BB%E9%8C%B2%E3%81%97%E3%81%BE%E3%81%97%E3%81%9F%E3%80%82",
-      );
+      setSuccessMessage("免許・許可情報を保存しました。");
+      router.refresh();
     } finally {
       setSubmitting(false);
     }
@@ -92,6 +93,13 @@ export function RenewalCreateForm({
         <div className="mb-4 rounded-[24px] border border-rose-200/80 bg-rose-50/95 p-4 text-rose-950">
           <p className="text-sm font-semibold">保存エラー</p>
           <p className="mt-2 text-sm leading-6">{formError}</p>
+        </div>
+      ) : null}
+
+      {successMessage ? (
+        <div className="mb-4 rounded-[24px] border border-emerald-200/80 bg-emerald-50/95 p-4 text-emerald-950">
+          <p className="text-sm font-semibold">保存完了</p>
+          <p className="mt-2 text-sm leading-6">{successMessage}</p>
         </div>
       ) : null}
 

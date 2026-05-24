@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   calculateGunLicenseExpiresOn,
   calculateHuntingLicenseExpiresOn,
@@ -8,8 +9,9 @@ import {
 } from "@/lib/format";
 import {
   createFirearmBarrelRecordAction,
-  deleteFirearmBarrelRecordAction,
+  deleteSelectedFirearmBarrelRecordsAction,
   deleteFirearmRecordAction,
+  setPrimaryFirearmBarrelRecordAction,
   updateFirearmBarrelRecordAction,
   updateFirearmRecordAction,
   updateHuntingLicenseInfoAction,
@@ -31,6 +33,7 @@ type Barrel = {
   features?: string | null;
   purposeMemo?: string | null;
   notes?: string | null;
+  isPrimary: boolean;
 };
 type Firearm = {
   id: string;
@@ -62,6 +65,8 @@ type Renewal = {
   statusLabel: string;
   issuedOn?: string;
   expiresOn?: string;
+  targetDate?: string;
+  reminderStartOn?: string;
   originalPermittedOn?: string;
   originalPermitNumber?: string | null;
   permitNumber?: string | null;
@@ -98,11 +103,15 @@ function FieldGrid({ items }: { items: Item[] }) {
   );
 }
 
+function getBarrelDisplayName(index: number, barrel: Barrel) {
+  return `${index === 0 ? "銃身情報" : `替え銃身 ${index}`} / ${barrel.barrelTypeLabel}`;
+}
+
 function Actions({ onCancel }: { onCancel: () => void }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row">
       <button className="min-h-11 rounded-full bg-[#34C759] px-5 text-sm font-bold !text-white transition-colors hover:bg-[#28A745]">
-        保存
+        更新する
       </button>
       <button
         type="button"
@@ -123,6 +132,45 @@ function Note() {
   );
 }
 
+function ActionFeedback({
+  state,
+  successMessage,
+}: {
+  state: { success: boolean; errors?: Record<string, string>; message?: string } | null;
+  successMessage: string;
+}) {
+  if (!state) {
+    return null;
+  }
+
+  if (state.success) {
+    return (
+      <div className="max-w-full overflow-hidden break-words rounded-[18px] border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-950">
+        {successMessage}
+      </div>
+    );
+  }
+
+  if (state.errors) {
+    return (
+      <div className="max-w-full overflow-hidden break-words rounded-[18px] border border-red-200 bg-red-50 p-3">
+        <p className="text-sm font-semibold text-red-800">入力エラーがあります</p>
+        <ul className="mt-2 list-disc list-inside text-sm text-red-700">
+          {Object.entries(state.errors).map(([key, message]) => (
+            <li key={key} className="break-words">{message as string}</li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-[18px] border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800">
+      {state.message ?? "更新に失敗しました。"}
+    </div>
+  );
+}
+
 export function RenewalRecordCard({
   renewal,
   userBirthDate,
@@ -130,7 +178,13 @@ export function RenewalRecordCard({
   renewal: Renewal;
   userBirthDate: string;
 }) {
+  const router = useRouter();
+  const firearm = renewal.firearmRecords[0];
+  const actualPrimaryBarrelId =
+    firearm?.barrelRecords.find((barrel) => barrel.isPrimary)?.id ?? "";
   const [editing, setEditing] = useState<"permit" | "firearm" | string | null>(null);
+  const [selectedBarrelIds, setSelectedBarrelIds] = useState<string[]>([]);
+  const [primaryBarrelId, setPrimaryBarrelId] = useState(actualPrimaryBarrelId);
   const [permitOriginalPermittedOn, setPermitOriginalPermittedOn] = useState(
     renewal.originalPermittedOn ?? "",
   );
@@ -142,7 +196,14 @@ export function RenewalRecordCard({
   const [permitState, permitAction] = useActionState(updateRenewalPermitInfoAction, null);
   const [firearmState, firearmAction] = useActionState(updateFirearmRecordAction, null);
   const [barrelState, barrelAction] = useActionState(updateFirearmBarrelRecordAction, null);
-  const firearm = renewal.firearmRecords[0];
+  const [deleteBarrelsState, deleteBarrelsAction] = useActionState(
+    deleteSelectedFirearmBarrelRecordsAction,
+    null,
+  );
+  const [primaryBarrelState, primaryBarrelAction] = useActionState(
+    setPrimaryFirearmBarrelRecordAction,
+    null,
+  );
   const calculatedPermitExpiresOn = calculateGunLicenseExpiresOn(
     userBirthDate,
     permitOriginalPermittedOn,
@@ -153,6 +214,31 @@ export function RenewalRecordCard({
   function handlePermitOriginalPermittedOnChange(value: string) {
     setPermitOriginalPermittedOn(value);
   }
+
+  function toggleBarrelSelection(id: string, checked: boolean) {
+    setSelectedBarrelIds((current) =>
+      checked
+        ? Array.from(new Set([...current, id]))
+        : current.filter((item) => item !== id),
+    );
+  }
+
+  useEffect(() => {
+    setPrimaryBarrelId(actualPrimaryBarrelId);
+  }, [actualPrimaryBarrelId]);
+
+  useEffect(() => {
+    if (!primaryBarrelState) {
+      return;
+    }
+
+    if (primaryBarrelState.success) {
+      router.refresh();
+      return;
+    }
+
+    setPrimaryBarrelId(actualPrimaryBarrelId);
+  }, [actualPrimaryBarrelId, primaryBarrelState, router]);
 
   return (
     <div className="grid gap-4">
@@ -179,16 +265,10 @@ export function RenewalRecordCard({
           </div>
           {editing === "hunting" ? (
             <form action={huntingAction} className="grid gap-3">
-              {huntingState && !huntingState.success && huntingState.errors ? (
-                <div className="rounded-[18px] border border-red-200 bg-red-50 p-3">
-                  <p className="text-sm font-semibold text-red-800">入力エラーがあります</p>
-                  <ul className="mt-2 list-disc list-inside text-sm text-red-700">
-                    {Object.entries(huntingState.errors).map(([key, message]) => (
-                      <li key={key}>{message as string}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
+              <ActionFeedback
+                state={huntingState}
+                successMessage="免許・許可情報を更新しました。"
+              />
               <input type="hidden" name="id" value={renewal.id} />
               <input type="hidden" name="status" value={renewal.status} />
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
@@ -229,6 +309,8 @@ export function RenewalRecordCard({
               items={[
                 { label: "交付日", value: displayDate(renewal.issuedOn) },
                 { label: "有効期限日", value: displayDate(renewal.expiresOn) },
+                { label: "更新予定日", value: displayDate(renewal.targetDate) },
+                { label: "通知開始目安", value: displayDate(renewal.reminderStartOn) },
                 { label: "メモ", value: renewal.notes },
               ]}
             />
@@ -255,16 +337,10 @@ export function RenewalRecordCard({
         </div>
         {editing === "permit" ? (
           <form action={permitAction} className="grid gap-3">
-            {permitState && !permitState.success && permitState.errors && (
-              <div className="rounded-[18px] border border-red-200 bg-red-50 p-3">
-                <p className="text-sm font-semibold text-red-800">入力エラーがあります</p>
-                <ul className="mt-2 list-disc list-inside text-sm text-red-700">
-                  {Object.entries(permitState.errors).map(([key, message]) => (
-                    <li key={key}>{message as string}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            <ActionFeedback
+              state={permitState}
+              successMessage="免許・許可情報を更新しました。"
+            />
             <input type="hidden" name="id" value={renewal.id} />
             <input type="hidden" name="status" value={renewal.status} />
             <Note />
@@ -290,6 +366,8 @@ export function RenewalRecordCard({
               { label: "今回の許可番号", value: permitNumber(renewal.permitNumber) },
               { label: "交付日", value: displayDate(renewal.issuedOn) },
               { label: "有効期限日", value: displayDate(renewal.expiresOn) },
+              { label: "更新予定日", value: displayDate(renewal.targetDate) },
+              { label: "通知開始目安", value: displayDate(renewal.reminderStartOn) },
               { label: "確認日", value: displayDate(renewal.confirmedOn) },
               { label: "有効期間", value: renewal.validityDescription },
               { label: "更新申請期間開始日", value: displayDate(renewal.applicationStartOn) },
@@ -311,7 +389,16 @@ export function RenewalRecordCard({
             </div>
             {editing !== "firearm" ? <button type="button" onClick={() => setEditing("firearm")} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700">編集</button> : null}
           </div>
-          {editing === "firearm" ? <FirearmForm firearm={firearm} onCancel={() => setEditing(null)} state={firearmState} action={firearmAction} /> : <FirearmView firearm={firearm} />}
+          {editing === "firearm" ? (
+            <FirearmForm
+              firearm={firearm}
+              onCancel={() => setEditing(null)}
+              state={firearmState}
+              action={firearmAction}
+            />
+          ) : (
+            <FirearmView firearm={firearm} primaryBarrelId={primaryBarrelId} />
+          )}
           <div className="mt-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm font-semibold text-slate-900">
@@ -327,6 +414,22 @@ export function RenewalRecordCard({
                 </button>
               ) : null}
             </div>
+            {firearm.barrelRecords.length > 0 &&
+            !primaryBarrelId ? (
+              <p className="mt-2 rounded-[18px] border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+                本銃身が未設定です。銃身カードの「本銃身にする」から1本選択してください。
+              </p>
+            ) : null}
+            <div className="mt-3 grid gap-2">
+              <ActionFeedback
+                state={primaryBarrelState}
+                successMessage="本銃身を設定しました。"
+              />
+              <ActionFeedback
+                state={deleteBarrelsState}
+                successMessage="選択した銃身を削除しました。"
+              />
+            </div>
             <div className="mt-3 grid gap-3">
               {editing === "new-barrel" ? (
                 <NewBarrelForm
@@ -335,9 +438,49 @@ export function RenewalRecordCard({
                 />
               ) : null}
               {firearm.barrelRecords.map((barrel, index) => (
-                <BarrelCard key={barrel.id} barrel={barrel} index={index} editing={editing === barrel.id} onEdit={() => setEditing(barrel.id)} onCancel={() => setEditing(null)} state={barrelState} action={barrelAction} />
+                <BarrelCard
+                  key={barrel.id}
+                  barrel={barrel}
+                  index={index}
+                  editing={editing === barrel.id}
+                  selected={selectedBarrelIds.includes(barrel.id)}
+                  isPrimary={primaryBarrelId === barrel.id}
+                  onSelect={(checked) => toggleBarrelSelection(barrel.id, checked)}
+                  onPrimarySelect={() => setPrimaryBarrelId(barrel.id)}
+                  onEdit={() => setEditing(barrel.id)}
+                  onCancel={() => setEditing(null)}
+                  state={barrelState}
+                  action={barrelAction}
+                  primaryAction={primaryBarrelAction}
+                />
               ))}
             </div>
+            <form
+              action={deleteBarrelsAction}
+              className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+              onSubmit={(event) => {
+                if (selectedBarrelIds.length === 0) {
+                  event.preventDefault();
+                  return;
+                }
+                if (!confirm("選択した銃身を削除します。よろしいですか？")) {
+                  event.preventDefault();
+                }
+              }}
+            >
+              {selectedBarrelIds.map((id) => (
+                <input key={id} type="hidden" name="barrelIds" value={id} />
+              ))}
+              <p className="text-xs leading-6 text-slate-600">
+                本銃身は削除できません。先に別の銃身を本銃身に設定してください。
+              </p>
+              <button
+                disabled={selectedBarrelIds.length === 0}
+                className="min-h-11 rounded-full border border-red-200 bg-white px-5 text-sm font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                選択した銃身を削除
+              </button>
+            </form>
           </div>
         </section>
       ) : null}
@@ -345,7 +488,18 @@ export function RenewalRecordCard({
   );
 }
 
-function FirearmView({ firearm }: { firearm: Firearm }) {
+function FirearmView({
+  firearm,
+  primaryBarrelId,
+}: {
+  firearm: Firearm;
+  primaryBarrelId: string;
+}) {
+  const primaryBarrelIndex = firearm.barrelRecords.findIndex(
+    (barrel) => barrel.id === primaryBarrelId,
+  );
+  const primaryBarrel =
+    primaryBarrelIndex >= 0 ? firearm.barrelRecords[primaryBarrelIndex] : null;
   const items: Item[] = [
     { label: "銃の全長", value: firearm.totalLength },
     { label: "銃身長", value: firearm.barrelLength },
@@ -357,6 +511,12 @@ function FirearmView({ firearm }: { firearm: Firearm }) {
     { label: "用途", value: firearm.purposeText },
     { label: "状態", value: firearm.statusLabel },
     { label: "備考", value: firearm.notes },
+    {
+      label: "本銃身",
+      value: primaryBarrel
+        ? getBarrelDisplayName(primaryBarrelIndex, primaryBarrel)
+        : "未設定",
+    },
   ];
 
   return (
@@ -429,8 +589,35 @@ function FirearmForm({ firearm, onCancel, state, action }: { firearm: Firearm; o
   );
 }
 
-function BarrelCard({ barrel, index, editing, onEdit, onCancel, state, action }: { barrel: Barrel; index: number; editing: boolean; onEdit: () => void; onCancel: () => void; state: any; action: any }) {
+function BarrelCard({
+  barrel,
+  index,
+  editing,
+  selected,
+  isPrimary,
+  onSelect,
+  onPrimarySelect,
+  onEdit,
+  onCancel,
+  state,
+  action,
+  primaryAction,
+}: {
+  barrel: Barrel;
+  index: number;
+  editing: boolean;
+  selected: boolean;
+  isPrimary: boolean;
+  onSelect: (checked: boolean) => void;
+  onPrimarySelect: () => void;
+  onEdit: () => void;
+  onCancel: () => void;
+  state: any;
+  action: any;
+  primaryAction: any;
+}) {
   const items: Item[] = [
+    { label: "本銃身", value: isPrimary ? "現在の本銃身" : "いいえ" },
     { label: "種類", value: barrel.firearmKind },
     { label: "口径", value: barrel.caliber },
     { label: "銃身長", value: barrel.barrelLength },
@@ -469,22 +656,52 @@ function BarrelCard({ barrel, index, editing, onEdit, onCancel, state, action }:
           <label className={formFieldLabel + " lg:col-span-2"}><span className={formLabelText}>用途メモ</span><input name="barrelPurposeMemo" defaultValue={barrel.purposeMemo ?? ""} className={formFieldCompact} /></label>
           <label className={formFieldLabel + " lg:col-span-2"}><span className={formLabelText}>備考</span><input name="barrelNotes" defaultValue={barrel.notes ?? ""} className={formFieldCompact} /></label>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <Actions onCancel={onCancel} />
-          <button
-            formAction={deleteFirearmBarrelRecordAction}
-            className="min-h-11 rounded-full border border-red-200 bg-white px-5 text-sm font-semibold text-red-700"
-          >
-            削除
-          </button>
-        </div>
+        <Actions onCancel={onCancel} />
       </form>
     );
   }
   return (
-    <div className="rounded-[18px] border border-emerald-950/10 bg-white p-3">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <p className="text-sm font-semibold text-slate-950">{index === 0 ? "銃身情報" : `替え銃身 ${index}`} / {barrel.barrelTypeLabel}</p>
+    <div className={`rounded-[18px] border p-3 ${isPrimary ? "border-emerald-300 bg-emerald-50/80" : "border-emerald-950/10 bg-white"}`}>
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-semibold text-slate-950">
+              {getBarrelDisplayName(index, barrel)}
+            </p>
+            {isPrimary ? (
+              <span className="rounded-full bg-emerald-700 px-3 py-1 text-xs font-bold text-white">
+                本銃身
+              </span>
+            ) : null}
+          </div>
+          <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center">
+            <label className="inline-flex items-center gap-2 font-semibold text-slate-700">
+              <input
+                type="checkbox"
+                checked={selected}
+                onChange={(event) => onSelect(event.target.checked)}
+                className="size-4 accent-red-600"
+              />
+              この銃身を削除対象にする
+            </label>
+            <form action={primaryAction}>
+              <input type="hidden" name="barrelId" value={barrel.id} />
+              <label className="inline-flex cursor-pointer items-center gap-2 font-semibold text-slate-700">
+                <input
+                  type="radio"
+                  name="primaryBarrel"
+                  checked={isPrimary}
+                  onChange={(event) => {
+                    onPrimarySelect();
+                    event.currentTarget.form?.requestSubmit();
+                  }}
+                  className="size-4 accent-emerald-700"
+                />
+                本銃身にする
+              </label>
+            </form>
+          </div>
+        </div>
         <button type="button" onClick={onEdit} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700">編集</button>
       </div>
       <FieldGrid items={items} />

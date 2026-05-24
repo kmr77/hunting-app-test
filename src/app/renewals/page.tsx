@@ -1,10 +1,10 @@
 import {
-  deleteRenewalAction,
   deleteRenewalPermitImageAction,
   uploadRenewalPermitImageAction,
 } from "@/app/actions";
 import { FeedbackBanner } from "@/components/feedback-banner";
 import { RenewalCreateForm } from "@/components/renewals/renewal-create-form";
+import { RenewalDeleteForm } from "@/components/renewals/renewal-delete-form";
 import { PermitImageUploader } from "@/components/renewals/permit-image-uploader";
 import { RenewalRecordCard } from "@/components/renewals/renewal-record-card";
 import { SubmitButton } from "@/components/submit-button";
@@ -129,6 +129,8 @@ export default async function RenewalsPage({
                 statusLabel: renewalStatusLabels[renewal.status],
                 issuedOn: formatDateInput(renewal.issuedOn),
                 expiresOn: formatDateInput(renewal.expiresOn),
+                targetDate: formatDateInput(renewal.targetDate),
+                reminderStartOn: formatDateInput(renewal.reminderStartOn),
                 originalPermittedOn: formatDateInput(
                   renewal.originalPermittedOn,
                 ),
@@ -172,6 +174,7 @@ export default async function RenewalsPage({
                     features: barrel.features,
                     purposeMemo: barrel.purposeMemo,
                     notes: barrel.notes,
+                    isPrimary: barrel.isPrimary,
                   })),
                 })),
               };
@@ -264,12 +267,7 @@ export default async function RenewalsPage({
                   </section>
                 ) : null}
 
-                <form action={deleteRenewalAction} className="mt-3">
-                  <input type="hidden" name="id" value={renewal.id} />
-                  <SubmitButton variant="danger" pendingChildren="削除中...">
-                    この記録を削除
-                  </SubmitButton>
-                </form>
+                <RenewalDeleteForm renewalId={renewal.id} />
               </article>
               );
             })

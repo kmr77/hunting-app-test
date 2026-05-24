@@ -84,6 +84,10 @@ function getFormDataStrings(formData: FormData, key: string) {
     .map((value) => (typeof value === "string" ? value.trim() : ""));
 }
 
+function getFormDataStringSet(formData: FormData, key: string) {
+  return new Set(getFormDataStrings(formData, key).filter(Boolean));
+}
+
 function buildFirearmBarrelInputs(formData: FormData) {
   const barrelTypes = getFormDataStrings(formData, "barrelType[]");
   const firearmKinds = getFormDataStrings(formData, "barrelFirearmKind[]");
@@ -106,6 +110,7 @@ function buildFirearmBarrelInputs(formData: FormData) {
       features: normalizeGeneralText(features[index] ?? ""),
       purposeMemo: normalizeGeneralText(purposeMemos[index] ?? ""),
       notes: normalizeGeneralText(notes[index] ?? ""),
+      isPrimary: index === 0,
     }))
     .filter(
       (barrel) =>
@@ -449,6 +454,43 @@ export async function upsertRenewalAction(
     return { success: false, errors };
   }
 
+  const duplicate = await withPrismaRetry((prisma) =>
+    prisma.renewalRecord.findFirst({
+      where: {
+        userId: user.id,
+        deletedAt: null,
+        ...(id ? { id: { not: id } } : {}),
+        ...(category === RenewalCategory.GUN_LICENSE
+          ? {
+              category: RenewalCategory.GUN_LICENSE,
+              originalPermittedOn,
+              issuedOn,
+            }
+          : {
+              category: RenewalCategory.HUNTING_LICENSE,
+              issuedOn,
+            }),
+      },
+      select: { id: true },
+    }),
+  );
+
+  if (duplicate) {
+    return {
+      success: false,
+      errors:
+        category === RenewalCategory.GUN_LICENSE
+          ? {
+              originalPermittedOn:
+                "同じ許可日・交付日の銃砲所持許可はすでに登録されています。",
+            }
+          : {
+              issuedOn:
+                "同じ交付日の狩猟免許（狩猟免状）はすでに登録されています。",
+            },
+    };
+  }
+
   const renewalRuleConfig = await resolveRenewalRule("COMMON", category);
   const targetDate = expiresOn;
   const reminderStartOn = targetDate
@@ -542,12 +584,13 @@ export async function upsertRenewalAction(
   return { success: true };
 }
 
-export async function deleteRenewalAction(formData: FormData) {
-  const pathname = "/renewals";
+export async function deleteRenewalAction(
+  formData: FormData,
+): Promise<RenewalActionResult> {
   const id = getString(formData, "id");
 
   if (!id) {
-    redirectWithMessage(pathname, "error", "削除に失敗しました。");
+    return { success: false, message: "削除に失敗しました。" };
   }
 
   try {
@@ -577,11 +620,11 @@ export async function deleteRenewalAction(formData: FormData) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "更新記録の削除に失敗しました。";
-    redirectWithMessage(pathname, "error", message);
+    return { success: false, message };
   }
 
   revalidateAppPaths("/", "/renewals", "/account");
-  redirectWithMessage(pathname, "success", "削除しました。");
+  return { success: true };
 }
 
 export async function updateRenewalPermitInfoAction(
@@ -635,6 +678,30 @@ export async function updateRenewalPermitInfoAction(
     const category = renewal.category;
     if (category !== RenewalCategory.GUN_LICENSE) {
       throw new Error("銃砲所持許可の記録ではありません。");
+    }
+
+    const duplicate = await withPrismaRetry((prisma) =>
+      prisma.renewalRecord.findFirst({
+        where: {
+          id: { not: id },
+          userId: user.id,
+          deletedAt: null,
+          category: RenewalCategory.GUN_LICENSE,
+          originalPermittedOn,
+          issuedOn: getOptionalDate(formData, "issuedOn"),
+        },
+        select: { id: true },
+      }),
+    );
+
+    if (duplicate) {
+      return {
+        success: false,
+        errors: {
+          originalPermittedOn:
+            "同じ許可日・交付日の銃砲所持許可はすでに登録されています。",
+        },
+      };
     }
 
     if (!user.profile?.birthDate) {
@@ -747,6 +814,29 @@ export async function updateHuntingLicenseInfoAction(
     const renewal = await requireRenewalRecord(id, user.id);
     if (renewal.category !== RenewalCategory.HUNTING_LICENSE) {
       throw new Error("狩猟免許（狩猟免状）の記録ではありません。");
+    }
+
+    const duplicate = await withPrismaRetry((prisma) =>
+      prisma.renewalRecord.findFirst({
+        where: {
+          id: { not: id },
+          userId: user.id,
+          deletedAt: null,
+          category: RenewalCategory.HUNTING_LICENSE,
+          issuedOn,
+        },
+        select: { id: true },
+      }),
+    );
+
+    if (duplicate) {
+      return {
+        success: false,
+        errors: {
+          issuedOn:
+            "同じ交付日の狩猟免許（狩猟免状）はすでに登録されています。",
+        },
+      };
     }
 
     const renewalRuleConfig = await resolveRenewalRule(
@@ -987,7 +1077,14 @@ export async function createFirearmBarrelRecordAction(formData: FormData) {
             deletedAt: null,
           },
         },
-        select: { id: true },
+        select: {
+          id: true,
+          barrelRecords: {
+            where: { deletedAt: null },
+            select: { id: true },
+            take: 1,
+          },
+        },
       }),
     );
 
@@ -1010,6 +1107,7 @@ export async function createFirearmBarrelRecordAction(formData: FormData) {
           features: getOptionalNormalizedText(formData, "barrelFeatures"),
           purposeMemo: getOptionalNormalizedText(formData, "barrelPurposeMemo"),
           notes: getOptionalNormalizedText(formData, "barrelNotes"),
+          isPrimary: firearm.barrelRecords.length === 0,
         },
       }),
     );
@@ -1048,12 +1146,16 @@ export async function deleteFirearmBarrelRecordAction(formData: FormData) {
             },
           },
         },
-        select: { id: true },
+        select: { id: true, isPrimary: true },
       }),
     );
 
     if (!barrel) {
       throw new Error("銃身情報が見つかりません。");
+    }
+
+    if (barrel.isPrimary) {
+      throw new Error("本銃身は削除できません。先に別の銃身を本銃身に設定してください。");
     }
 
     await withPrismaRetry((prisma) =>
@@ -1072,6 +1174,131 @@ export async function deleteFirearmBarrelRecordAction(formData: FormData) {
 
   revalidateAppPaths("/renewals");
   redirectWithMessage(pathname, "success", "削除しました。");
+}
+
+export async function deleteSelectedFirearmBarrelRecordsAction(
+  prevState: RenewalActionResult | null,
+  formData: FormData,
+): Promise<RenewalActionResult> {
+  const ids = Array.from(getFormDataStringSet(formData, "barrelIds"));
+
+  if (ids.length === 0) {
+    return {
+      success: false,
+      message: "削除する銃身を選択してください。",
+    };
+  }
+
+  try {
+    const user = await getCurrentUser();
+    const barrels = await withPrismaRetry((prisma) =>
+      prisma.firearmBarrelRecord.findMany({
+        where: {
+          id: { in: ids },
+          deletedAt: null,
+          firearmRecord: {
+            deletedAt: null,
+            renewalRecord: {
+              userId: user.id,
+              deletedAt: null,
+            },
+          },
+        },
+        select: { id: true, isPrimary: true },
+      }),
+    );
+
+    if (barrels.length !== ids.length) {
+      throw new Error("削除対象の銃身情報が見つかりません。");
+    }
+
+    if (barrels.some((barrel) => barrel.isPrimary)) {
+      return {
+        success: false,
+        message:
+          "本銃身は削除できません。先に別の銃身を本銃身に設定してください。",
+      };
+    }
+
+    await withPrismaRetry((prisma) =>
+      prisma.firearmBarrelRecord.updateMany({
+        where: { id: { in: ids } },
+        data: { deletedAt: new Date() },
+      }),
+    );
+  } catch (error) {
+    console.error("Failed to delete selected firearm barrels", error);
+    return {
+      success: false,
+      message: "選択した銃身情報の削除に失敗しました。",
+    };
+  }
+
+  revalidateAppPaths("/renewals");
+  return { success: true };
+}
+
+export async function setPrimaryFirearmBarrelRecordAction(
+  prevState: RenewalActionResult | null,
+  formData: FormData,
+): Promise<RenewalActionResult> {
+  const id = getString(formData, "barrelId");
+
+  if (!id) {
+    return {
+      success: false,
+      message: "本銃身にする銃身を選択してください。",
+    };
+  }
+
+  try {
+    const user = await getCurrentUser();
+    const barrel = await withPrismaRetry((prisma) =>
+      prisma.firearmBarrelRecord.findFirst({
+        where: {
+          id,
+          deletedAt: null,
+          firearmRecord: {
+            deletedAt: null,
+            renewalRecord: {
+              userId: user.id,
+              deletedAt: null,
+            },
+          },
+        },
+        select: { id: true, firearmRecordId: true },
+      }),
+    );
+
+    if (!barrel) {
+      throw new Error("銃身情報が見つかりません。");
+    }
+
+    await withPrismaRetry((prisma) =>
+      prisma.$transaction([
+        prisma.firearmBarrelRecord.updateMany({
+          where: {
+            firearmRecordId: barrel.firearmRecordId,
+            deletedAt: null,
+          },
+          data: { isPrimary: false },
+        }),
+        prisma.firearmBarrelRecord.update({
+          where: { id: barrel.id },
+          data: { isPrimary: true },
+        }),
+      ]),
+    );
+  } catch (error) {
+    console.error("Failed to set primary firearm barrel", error);
+    return {
+      success: false,
+      message: "本銃身の設定に失敗しました。",
+    };
+  }
+
+  revalidateAppPaths("/renewals");
+  return { success: true };
 }
 
 export async function deleteFirearmRecordAction(formData: FormData) {

@@ -265,7 +265,7 @@ export async function getRenewalPageData() {
                 where: {
                   deletedAt: null,
                 },
-                orderBy: { createdAt: "asc" },
+                orderBy: [{ createdAt: "asc" }, { id: "asc" }],
               },
             },
             orderBy: { createdAt: "asc" },
