@@ -48,8 +48,14 @@ textarea {
 }
 
 .positive-cta {
+  background-color: #2e7d32;
+  color: #ffffff;
   font-weight: 800;
   letter-spacing: 0.02em;
+}
+
+.positive-cta:hover:not(:disabled) {
+  background-color: #256528;
 }
 
 input:focus,

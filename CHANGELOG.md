@@ -23,6 +23,7 @@
 - `/renewals` の許可証画像ファイル選択UIを専用classに切り替え、主要CTAスタイルを流用しない通常入力サイズへ調整。
 - 保存・登録・更新・追加系の肯定系CTAボタン文字を `font-extrabold` に変更し、視認上の太字感を強めた。
 - 肯定系CTA専用のCSS classで `font-weight: 800` と `letter-spacing: 0.02em` を明示し、Tailwind classだけに依存せず太字感が出るように調整。
+- 肯定系CTA専用のCSS classにも `background-color: #2e7d32` と hover色 `#256528` を明示し、保存・登録・更新・追加系CTAの背景色を再統一。
 
 ## 2026-05-13
 
