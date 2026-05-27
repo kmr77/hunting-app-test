@@ -13,11 +13,11 @@ type SubmitButtonProps = {
 
 const variantClasses = {
   primary:
-    "bg-[#34C759] font-bold !text-white hover:bg-[#28A745] disabled:bg-[#34C759]/55",
+    "positive-cta bg-[#2e7d32] font-extrabold !text-white hover:bg-[#256528] disabled:bg-[#2e7d32]/55",
   secondary:
-    "border border-emerald-200 text-emerald-800 hover:bg-emerald-50 disabled:text-emerald-800/55 disabled:border-emerald-200/60",
+    "border border-emerald-200 font-semibold text-emerald-800 hover:bg-emerald-50 disabled:text-emerald-800/55 disabled:border-emerald-200/60",
   danger:
-    "border border-rose-200 text-rose-700 hover:bg-rose-50 disabled:text-rose-700/55 disabled:border-rose-200/60",
+    "border border-rose-200 font-semibold text-rose-700 hover:bg-rose-50 disabled:text-rose-700/55 disabled:border-rose-200/60",
 } as const;
 
 export function SubmitButton({
@@ -38,7 +38,7 @@ export function SubmitButton({
       type="submit"
       disabled={isDisabled}
       aria-disabled={isDisabled}
-      className={`inline-flex min-h-11 items-center justify-center rounded-full px-4 text-sm font-semibold transition-colors disabled:cursor-not-allowed ${variantClasses[variant]} ${className}`}
+      className={`inline-flex min-h-11 items-center justify-center rounded-full px-4 text-sm transition-colors disabled:cursor-not-allowed ${variantClasses[variant]} ${className}`}
       {...props}
     >
       {isPending ? pendingChildren ?? "送信中..." : children}

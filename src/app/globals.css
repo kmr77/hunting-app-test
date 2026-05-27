@@ -38,13 +38,18 @@ button,
 input,
 select,
 textarea {
-  font: inherit;
+  font-family: inherit;
 }
 
 input,
 select,
 textarea {
   outline: none;
+}
+
+.positive-cta {
+  font-weight: 800;
+  letter-spacing: 0.02em;
 }
 
 input:focus,

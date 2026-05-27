@@ -1,12 +1,14 @@
 "use client";
 
 import { useRef, useState, type ChangeEvent } from "react";
-import { formFieldCompact, formFieldLabel, formLabelText } from "@/lib/form-classes";
+import { formFieldLabel, formLabelText } from "@/lib/form-classes";
 import { SubmitButton } from "@/components/submit-button";
 
 const MAX_IMAGE_EDGE = 1600;
 const WEBP_QUALITY = 0.82;
 const MAX_COMPRESSED_BYTES = 1_600_000;
+const fileInputClass =
+  "w-full max-w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:leading-5 file:text-slate-700 hover:file:bg-slate-200";
 
 type PermitImageUploaderProps = {
   action: (formData: FormData) => void;
@@ -105,7 +107,7 @@ export function PermitImageUploader({
           type="file"
           accept="image/*"
           onChange={handleFileChange}
-          className={formFieldCompact}
+          className={fileInputClass}
         />
       </label>
       <p className="text-xs leading-6 text-slate-600">{status}</p>

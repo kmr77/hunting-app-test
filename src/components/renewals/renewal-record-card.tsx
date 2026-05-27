@@ -110,7 +110,7 @@ function getBarrelDisplayName(index: number, barrel: Barrel) {
 function Actions({ onCancel }: { onCancel: () => void }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row">
-      <button className="min-h-11 rounded-full bg-[#34C759] px-5 text-sm font-bold !text-white transition-colors hover:bg-[#28A745]">
+      <button className="positive-cta min-h-11 rounded-full bg-[#2e7d32] px-5 text-sm font-extrabold !text-white transition-colors hover:bg-[#256528]">
         更新する
       </button>
       <button
