@@ -7,6 +7,7 @@ import {
   ActivityType,
   FileCategory,
   FirearmBarrelType,
+  FirearmInspectionStatus,
   FirearmStatus,
   FirearmType,
   HuntingMethod,
@@ -39,11 +40,32 @@ import {
   calculateGunLicenseExpiresOn,
   calculateHuntingLicenseExpiresOn,
 } from "@/lib/format";
+import {
+  firearmBarrelTypeLabels,
+  firearmTypeLabels,
+} from "@/lib/labels";
 
 export type FieldErrors = Record<string, string>;
 export type RenewalActionResult =
   | { success: true }
   | { success: false; errors?: FieldErrors; message?: string };
+export type AmmoActionValues = {
+  transactionDate: string;
+  recordType: string;
+  ammoCategory: string;
+  quantity: string;
+  caliber: string;
+  shotSize: string;
+  manufacturer: string;
+  supplierName: string;
+  memo: string;
+};
+export type AmmoActionState = {
+  success: boolean;
+  message?: string;
+  fieldErrors?: FieldErrors;
+  values: AmmoActionValues;
+};
 
 const PERMIT_IMAGE_MAX_BYTES = 1_600_000;
 const PERMIT_IMAGE_MIME_TYPE = "image/webp";
@@ -203,6 +225,102 @@ function normalizePhoneNumber(value: string | null) {
   return normalized.length > 0 ? normalized : null;
 }
 
+function normalizeAmmoCaliberInput(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = toHalfWidthAlnum(value)?.replace(/番/g, "").trim();
+  if (!normalized) {
+    return null;
+  }
+
+  return /^\d+$/.test(normalized) ? normalized : "";
+}
+
+const emptyAmmoActionValues: AmmoActionValues = {
+  transactionDate: "",
+  recordType: "PURCHASE",
+  ammoCategory: "SHOT_SHELL",
+  quantity: "25",
+  caliber: "",
+  shotSize: "",
+  manufacturer: "",
+  supplierName: "",
+  memo: "",
+};
+
+function getAmmoActionValues(formData: FormData): AmmoActionValues {
+  return {
+    transactionDate: getString(formData, "transactionDate"),
+    recordType: getString(formData, "recordType") || emptyAmmoActionValues.recordType,
+    ammoCategory: getString(formData, "ammoCategory") || emptyAmmoActionValues.ammoCategory,
+    quantity: getString(formData, "quantity"),
+    caliber: getString(formData, "caliber"),
+    shotSize: getString(formData, "shotSize"),
+    manufacturer: getString(formData, "manufacturer"),
+    supplierName: getString(formData, "supplierName"),
+    memo: getString(formData, "memo"),
+  };
+}
+
+function validateAmmoFormData(formData: FormData) {
+  const errors: FieldErrors = {};
+  const rawQuantity = getString(formData, "quantity");
+  const rawTransactionDate = getString(formData, "transactionDate");
+  const rawCaliber = getOptionalString(formData, "caliber");
+  const quantity = getInt(formData, "quantity");
+  const transactionDate = getOptionalDate(formData, "transactionDate");
+  const caliber = normalizeAmmoCaliberInput(rawCaliber);
+
+  if (!rawTransactionDate) {
+    errors.transactionDate = "日付を入力してください。";
+  } else if (!isValidDate(transactionDate)) {
+    errors.transactionDate = "日付はYYYYMMDDの半角数字8桁で入力してください。";
+  }
+
+  if (!rawQuantity) {
+    errors.quantity = "数量を入力してください。";
+  } else if (quantity <= 0) {
+    errors.quantity = "数量は1以上で入力してください。";
+  }
+
+  if (!rawCaliber) {
+    errors.caliber = "口径を入力してください。";
+  } else if (caliber === "") {
+    errors.caliber = "口径は数字のみで入力してください。";
+  }
+
+  return {
+    errors,
+    quantity,
+    transactionDate,
+    caliber,
+  };
+}
+
+function buildAmmoPayload(formData: FormData) {
+  const ammoCategory = getString(formData, "ammoCategory") as AmmoCategory;
+  const shotSize =
+    ammoCategory === AmmoCategory.SLUG
+      ? null
+      : normalizeGeneralText(getOptionalString(formData, "shotSize"));
+  const { quantity, transactionDate, caliber } = validateAmmoFormData(formData);
+
+  return {
+    recordType: getString(formData, "recordType") as AmmoRecordType,
+    ammoCategory,
+    caliber,
+    manufacturer: getOptionalNormalizedText(formData, "manufacturer"),
+    quantity,
+    unit: AmmoUnit.ROUND,
+    transactionDate: transactionDate as Date,
+    supplierName: getOptionalString(formData, "supplierName"),
+    slipNumber: shotSize,
+    memo: getOptionalString(formData, "memo"),
+  };
+}
+
 function subtractDays(date: Date, days: number) {
   const result = new Date(date);
   result.setDate(result.getDate() - days);
@@ -231,13 +349,17 @@ function redirectWithMessage(
   pathname: string,
   variant: "success" | "error",
   message: string,
+  target?: string,
 ): never {
   const params = new URLSearchParams({
     status: variant,
     message,
   });
+  if (target) {
+    params.set("target", target);
+  }
 
-  redirect(`${pathname}?${params.toString()}`);
+  redirect(`${pathname}?${params.toString()}${target ? `#${target}` : ""}`);
 }
 
 function redirectWithFieldMessage(
@@ -245,14 +367,18 @@ function redirectWithFieldMessage(
   variant: "success" | "error",
   message: string,
   field: string,
+  target?: string,
 ): never {
   const params = new URLSearchParams({
     status: variant,
     message,
     field,
   });
+  if (target) {
+    params.set("target", target);
+  }
 
-  redirect(`${pathname}?${params.toString()}`);
+  redirect(`${pathname}?${params.toString()}${target ? `#${target}` : ""}`);
 }
 
 function revalidateAppPaths(...paths: string[]) {
@@ -281,6 +407,43 @@ async function requireRenewalRecord(id: string, userId: string) {
   }
 
   return renewal;
+}
+
+async function requireGunLicenseRenewalRecord(id: string, userId: string) {
+  const renewal = await requireRenewalRecord(id, userId);
+  if (renewal.category !== RenewalCategory.GUN_LICENSE) {
+    throw new Error("銃砲所持許可の記録が見つかりません。");
+  }
+
+  return renewal;
+}
+
+async function requireFirearmInspectionRecord(id: string, userId: string) {
+  const inspection = await withPrismaRetry((prisma) =>
+    prisma.firearmInspectionRecord.findFirst({
+      where: {
+        id,
+        userId,
+        deletedAt: null,
+        renewalRecord: {
+          userId,
+          category: RenewalCategory.GUN_LICENSE,
+          deletedAt: null,
+        },
+      },
+      select: {
+        id: true,
+        renewalRecordId: true,
+        status: true,
+      },
+    }),
+  );
+
+  if (!inspection) {
+    throw new Error("銃検記録が見つかりません。");
+  }
+
+  return inspection;
 }
 
 function parseCompressedPermitImage(formData: FormData) {
@@ -351,6 +514,109 @@ async function requireHuntingEvent(id: string, userId: string) {
   }
 
   return event;
+}
+
+function formatToolCaliber(value: string | null | undefined) {
+  if (!value) {
+    return "口径未登録";
+  }
+
+  return /[^0-9.]/.test(value) ? value : `${value}番`;
+}
+
+function getReportFirearmBaseName(firearm: {
+  displayName: string;
+  manufacturer: string | null;
+  modelName: string | null;
+  firearmType: FirearmType;
+}) {
+  const parts = [
+    firearm.displayName,
+    firearm.manufacturer,
+    firearm.modelName,
+  ].filter((part) => part && part.trim().length > 0);
+
+  return parts.length > 0 ? parts.join(" ") : firearmTypeLabels[firearm.firearmType];
+}
+
+async function requireReportFirearmTool(
+  userId: string,
+  firearmRecordId: string | null,
+  firearmBarrelRecordId: string | null,
+) {
+  if (!firearmRecordId) {
+    return null;
+  }
+
+  const firearm = await withPrismaRetry((prisma) =>
+    prisma.firearmRecord.findFirst({
+      where: {
+        id: firearmRecordId,
+        deletedAt: null,
+        renewalRecord: {
+          userId,
+          deletedAt: null,
+        },
+      },
+      select: {
+        id: true,
+        displayName: true,
+        firearmType: true,
+        manufacturer: true,
+        modelName: true,
+        caliber: true,
+        barrelRecords: {
+          where: {
+            deletedAt: null,
+          },
+          select: {
+            id: true,
+            barrelType: true,
+            caliber: true,
+            features: true,
+            purposeMemo: true,
+          },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        },
+      },
+    }),
+  );
+
+  if (!firearm) {
+    throw new Error("使用道具に選択した銃が見つかりません。");
+  }
+
+  const firearmName = getReportFirearmBaseName(firearm);
+
+  if (!firearmBarrelRecordId) {
+    return {
+      firearmRecordId: firearm.id,
+      firearmBarrelRecordId: null,
+      toolName: `${firearmName} / 銃本体 / ${formatToolCaliber(firearm.caliber)}`,
+      notes: null,
+    };
+  }
+
+  const barrelIndex = firearm.barrelRecords.findIndex(
+    (barrel) => barrel.id === firearmBarrelRecordId,
+  );
+  const barrel = barrelIndex >= 0 ? firearm.barrelRecords[barrelIndex] : null;
+
+  if (!barrel) {
+    throw new Error("使用道具に選択した銃身が見つかりません。");
+  }
+
+  const barrelName = `${barrelIndex === 0 ? "銃身情報" : `替え銃身 ${barrelIndex}`} / ${firearmBarrelTypeLabels[barrel.barrelType]}`;
+  const notes = [barrel.features, barrel.purposeMemo]
+    .filter((value) => value && value.trim().length > 0)
+    .join(" / ");
+
+  return {
+    firearmRecordId: firearm.id,
+    firearmBarrelRecordId: barrel.id,
+    toolName: `${firearmName} / ${barrelName} / ${formatToolCaliber(barrel.caliber ?? firearm.caliber)}`,
+    notes: notes || null,
+  };
 }
 
 export async function upsertRenewalAction(
@@ -1301,6 +1567,251 @@ export async function setPrimaryFirearmBarrelRecordAction(
   return { success: true };
 }
 
+export async function upsertFirearmInspectionScheduleAction(
+  prevState: RenewalActionResult | null,
+  formData: FormData,
+): Promise<RenewalActionResult> {
+  const id = getString(formData, "id");
+  const renewalRecordId = getString(formData, "renewalRecordId");
+  const scheduledOn = getOptionalDate(formData, "scheduledOn");
+  const errors: FieldErrors = {};
+
+  const scheduledOnError = getDateInputError(
+    formData,
+    "scheduledOn",
+    "銃検予定日",
+    true,
+  );
+  if (scheduledOnError) {
+    errors.scheduledOn = scheduledOnError;
+  }
+  if (!renewalRecordId && !id) {
+    errors.renewalRecordId = "銃砲所持許可の記録を確認できません。";
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return { success: false, errors };
+  }
+
+  try {
+    const user = await getCurrentUser();
+    const notes = getOptionalNormalizedText(formData, "notes");
+    const safeScheduledOn = scheduledOn as Date;
+
+    if (id) {
+      const inspection = await requireFirearmInspectionRecord(id, user.id);
+
+      await withPrismaRetry((prisma) =>
+        prisma.firearmInspectionRecord.update({
+          where: { id: inspection.id },
+          data: {
+            scheduledOn: safeScheduledOn,
+            notes,
+          },
+        }),
+      );
+    } else {
+      await requireGunLicenseRenewalRecord(renewalRecordId, user.id);
+
+      const existingScheduled = await withPrismaRetry((prisma) =>
+        prisma.firearmInspectionRecord.findFirst({
+          where: {
+            userId: user.id,
+            renewalRecordId,
+            status: FirearmInspectionStatus.SCHEDULED,
+            deletedAt: null,
+          },
+          select: { id: true },
+        }),
+      );
+
+      if (existingScheduled) {
+        return {
+          success: false,
+          message:
+            "未実施の銃検予定がすでにあります。既存の予定を編集してください。",
+        };
+      }
+
+      await withPrismaRetry((prisma) =>
+        prisma.firearmInspectionRecord.create({
+          data: {
+            userId: user.id,
+            renewalRecordId,
+            scheduledOn: safeScheduledOn,
+            notes,
+          },
+        }),
+      );
+    }
+  } catch (error) {
+    console.error("Failed to save firearm inspection schedule", error);
+    return {
+      success: false,
+      message: "銃検情報の保存に失敗しました。入力内容を確認してください。",
+    };
+  }
+
+  revalidateAppPaths("/", "/renewals");
+  return { success: true };
+}
+
+export async function completeFirearmInspectionAction(
+  prevState: RenewalActionResult | null,
+  formData: FormData,
+): Promise<RenewalActionResult> {
+  const id = getString(formData, "id");
+  const inspectedOn = getOptionalDate(formData, "inspectedOn");
+  const errors: FieldErrors = {};
+
+  if (!id) {
+    errors.id = "銃検記録を確認できません。";
+  }
+  const inspectedOnError = getDateInputError(
+    formData,
+    "inspectedOn",
+    "銃検実施日",
+    true,
+  );
+  if (inspectedOnError) {
+    errors.inspectedOn = inspectedOnError;
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return { success: false, errors };
+  }
+
+  try {
+    const user = await getCurrentUser();
+    const inspection = await requireFirearmInspectionRecord(id, user.id);
+    if (inspection.status !== FirearmInspectionStatus.SCHEDULED) {
+      return {
+        success: false,
+        message: "未実施の銃検予定ではありません。",
+      };
+    }
+
+    await withPrismaRetry((prisma) =>
+      prisma.firearmInspectionRecord.update({
+        where: { id: inspection.id },
+        data: {
+          status: FirearmInspectionStatus.COMPLETED,
+          inspectedOn: inspectedOn as Date,
+          completedAt: new Date(),
+          notes: getOptionalNormalizedText(formData, "notes"),
+        },
+      }),
+    );
+  } catch (error) {
+    console.error("Failed to complete firearm inspection", error);
+    return {
+      success: false,
+      message: "銃検済みへの変更に失敗しました。",
+    };
+  }
+
+  revalidateAppPaths("/", "/renewals");
+  return { success: true };
+}
+
+export async function updateCompletedFirearmInspectionAction(
+  prevState: RenewalActionResult | null,
+  formData: FormData,
+): Promise<RenewalActionResult> {
+  const id = getString(formData, "id");
+  const scheduledOn = getOptionalDate(formData, "scheduledOn");
+  const inspectedOn = getOptionalDate(formData, "inspectedOn");
+  const errors: FieldErrors = {};
+
+  if (!id) {
+    errors.id = "銃検記録を確認できません。";
+  }
+  const scheduledOnError = getDateInputError(
+    formData,
+    "scheduledOn",
+    "銃検予定日",
+    true,
+  );
+  if (scheduledOnError) {
+    errors.scheduledOn = scheduledOnError;
+  }
+  const inspectedOnError = getDateInputError(
+    formData,
+    "inspectedOn",
+    "銃検実施日",
+    true,
+  );
+  if (inspectedOnError) {
+    errors.inspectedOn = inspectedOnError;
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return { success: false, errors };
+  }
+
+  try {
+    const user = await getCurrentUser();
+    const inspection = await requireFirearmInspectionRecord(id, user.id);
+
+    await withPrismaRetry((prisma) =>
+      prisma.firearmInspectionRecord.update({
+        where: { id: inspection.id },
+        data: {
+          scheduledOn: scheduledOn as Date,
+          status: FirearmInspectionStatus.COMPLETED,
+          inspectedOn: inspectedOn as Date,
+          completedAt: new Date(),
+          notes: getOptionalNormalizedText(formData, "notes"),
+        },
+      }),
+    );
+  } catch (error) {
+    console.error("Failed to update completed firearm inspection", error);
+    return {
+      success: false,
+      message: "銃検記録の更新に失敗しました。",
+    };
+  }
+
+  revalidateAppPaths("/", "/renewals");
+  return { success: true };
+}
+
+export async function reopenFirearmInspectionAction(
+  prevState: RenewalActionResult | null,
+  formData: FormData,
+): Promise<RenewalActionResult> {
+  const id = getString(formData, "id");
+  if (!id) {
+    return { success: false, message: "銃検記録を確認できません。" };
+  }
+
+  try {
+    const user = await getCurrentUser();
+    const inspection = await requireFirearmInspectionRecord(id, user.id);
+
+    await withPrismaRetry((prisma) =>
+      prisma.firearmInspectionRecord.update({
+        where: { id: inspection.id },
+        data: {
+          status: FirearmInspectionStatus.SCHEDULED,
+          inspectedOn: null,
+          completedAt: null,
+        },
+      }),
+    );
+  } catch (error) {
+    console.error("Failed to reopen firearm inspection", error);
+    return {
+      success: false,
+      message: "銃検済みの取り消しに失敗しました。",
+    };
+  }
+
+  revalidateAppPaths("/", "/renewals");
+  return { success: true };
+}
+
 export async function deleteFirearmRecordAction(formData: FormData) {
   const pathname = "/renewals";
   const id = getString(formData, "id");
@@ -1486,30 +1997,40 @@ export async function deleteRenewalPermitImageAction(formData: FormData) {
 export async function upsertAmmoAction(formData: FormData) {
   const pathname = "/ammo";
   const id = getOptionalString(formData, "id");
-  const quantity = getInt(formData, "quantity");
-  const transactionDate = getOptionalDate(formData, "transactionDate");
+  const target = id ? `ammo-record-${id}` : "ammo-new";
+  const validation = validateAmmoFormData(formData);
 
-  if (quantity <= 0) {
-    redirectWithMessage(pathname, "error", "保存に失敗しました。");
+  if (validation.errors.transactionDate) {
+    redirectWithFieldMessage(
+      pathname,
+      "error",
+      validation.errors.transactionDate,
+      "transactionDate",
+      target,
+    );
   }
 
-  if (!isValidDate(transactionDate)) {
-    redirectWithMessage(pathname, "error", "保存に失敗しました。");
+  if (validation.errors.quantity) {
+    redirectWithFieldMessage(
+      pathname,
+      "error",
+      validation.errors.quantity,
+      "quantity",
+      target,
+    );
   }
 
-  const safeTransactionDate = transactionDate as Date;
+  if (validation.errors.caliber) {
+    redirectWithFieldMessage(
+      pathname,
+      "error",
+      validation.errors.caliber,
+      "caliber",
+      target,
+    );
+  }
 
-  const payload = {
-    recordType: getString(formData, "recordType") as AmmoRecordType,
-    ammoCategory: getString(formData, "ammoCategory") as AmmoCategory,
-    caliber: getOptionalString(formData, "caliber"),
-    quantity,
-    unit: AmmoUnit.ROUND,
-    transactionDate: safeTransactionDate,
-    supplierName: getOptionalString(formData, "supplierName"),
-    slipNumber: getOptionalString(formData, "slipNumber"),
-    memo: getOptionalString(formData, "memo"),
-  };
+  const payload = buildAmmoPayload(formData);
 
   try {
     const user = await getCurrentUser();
@@ -1532,9 +2053,8 @@ export async function upsertAmmoAction(formData: FormData) {
       );
     }
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "実包記録の保存に失敗しました。";
-    redirectWithMessage(pathname, "error", message);
+    console.error("Failed to save ammo record", error);
+    redirectWithMessage(pathname, "error", "実包記録の保存に失敗しました。", target);
   }
 
   revalidateAppPaths("/", "/ammo", "/account");
@@ -1542,7 +2062,50 @@ export async function upsertAmmoAction(formData: FormData) {
     pathname,
     "success",
     id ? "実包記録を更新しました。" : "実包記録を登録しました。",
+    target,
   );
+}
+
+export async function createAmmoAction(
+  _previousState: AmmoActionState,
+  formData: FormData,
+): Promise<AmmoActionState> {
+  const values = getAmmoActionValues(formData);
+  const validation = validateAmmoFormData(formData);
+
+  if (Object.keys(validation.errors).length > 0) {
+    return {
+      success: false,
+      fieldErrors: validation.errors,
+      values,
+    };
+  }
+
+  try {
+    const user = await getCurrentUser();
+    await withPrismaRetry((prisma) =>
+      prisma.ammoRecord.create({
+        data: {
+          userId: user.id,
+          ...buildAmmoPayload(formData),
+        },
+      }),
+    );
+  } catch (error) {
+    console.error("Failed to create ammo record", error);
+    return {
+      success: false,
+      message: "実包記録の保存に失敗しました。入力内容を確認してください。",
+      values,
+    };
+  }
+
+  revalidateAppPaths("/", "/ammo", "/account");
+  return {
+    success: true,
+    message: "実包記録を登録しました。",
+    values: emptyAmmoActionValues,
+  };
 }
 
 export async function deleteAmmoAction(formData: FormData) {
@@ -1570,7 +2133,7 @@ export async function deleteAmmoAction(formData: FormData) {
   }
 
   revalidateAppPaths("/", "/ammo", "/account");
-  redirectWithMessage(pathname, "success", "削除しました。");
+  redirectWithMessage(pathname, "success", "削除しました。", "ammo-records");
 }
 
 export async function upsertHuntingEventAction(formData: FormData) {
@@ -1596,7 +2159,26 @@ export async function upsertHuntingEventAction(formData: FormData) {
   );
   const shotCountValue = getOptionalString(formData, "shotCount");
   const shotCount = shotCountValue ? getInt(formData, "shotCount") : null;
+  const shotShellUsedCount = getInt(formData, "shotShellUsedCount");
+  const slugUsedCount = getInt(formData, "slugUsedCount");
+  const airgunPelletUsedCount = getInt(formData, "airgunPelletUsedCount");
+  const totalAmmoUsed =
+    shotShellUsedCount + slugUsedCount + airgunPelletUsedCount;
   const toolName = getOptionalString(formData, "toolName");
+  const firearmToolSelection = getOptionalString(formData, "firearmToolSelection");
+  const firearmToolSelectionParts = firearmToolSelection?.split(":") ?? [];
+  const selectedFirearmRecordId =
+    getOptionalString(formData, "firearmRecordId") ??
+    (firearmToolSelection?.startsWith("firearm:")
+      ? firearmToolSelection.slice("firearm:".length)
+      : firearmToolSelectionParts[0] === "barrel"
+        ? firearmToolSelectionParts[1] ?? null
+      : null);
+  const selectedFirearmBarrelRecordId =
+    getOptionalString(formData, "firearmBarrelRecordId") ??
+    (firearmToolSelection?.startsWith("barrel:")
+      ? firearmToolSelectionParts[2] ?? null
+      : null);
 
   if (!isValidDate(eventDate)) {
     redirectWithMessage(pathname, "error", "保存に失敗しました。");
@@ -1621,10 +2203,19 @@ export async function upsertHuntingEventAction(formData: FormData) {
   }
 
   if (
-    activityType === ActivityType.SHOOTING &&
-    (!shootingType || !shootingRangeName || shotCount === null || !toolName)
+    shotShellUsedCount < 0 ||
+    slugUsedCount < 0 ||
+    airgunPelletUsedCount < 0
   ) {
+    redirectWithMessage(pathname, "error", "使用弾数は0以上で入力してください。");
+  }
+
+  if (activityType === ActivityType.SHOOTING && (!shootingType || !shootingRangeName)) {
     redirectWithMessage(pathname, "error", "保存に失敗しました。");
+  }
+
+  if (!selectedFirearmRecordId) {
+    redirectWithMessage(pathname, "error", "使用道具を選択してください。");
   }
 
   const payload =
@@ -1641,7 +2232,10 @@ export async function upsertHuntingEventAction(formData: FormData) {
           resultCount: null,
           shootingType,
           shootingRangeName,
-          shotCount,
+          shotCount: totalAmmoUsed,
+          shotShellUsedCount,
+          slugUsedCount,
+          airgunPelletUsedCount,
           isReportTransferTarget: false,
           importedToReportAt: null,
           notes: getOptionalString(formData, "notes"),
@@ -1665,12 +2259,24 @@ export async function upsertHuntingEventAction(formData: FormData) {
           shootingType: null,
           shootingRangeName: null,
           shotCount: null,
+          shotShellUsedCount,
+          slugUsedCount,
+          airgunPelletUsedCount,
           isReportTransferTarget: true,
           notes: getOptionalString(formData, "notes"),
         };
 
   try {
     const user = await getCurrentUser();
+    const selectedFirearmTool = await requireReportFirearmTool(
+      user.id,
+      selectedFirearmRecordId,
+      selectedFirearmBarrelRecordId,
+    );
+    const resolvedToolName = selectedFirearmTool?.toolName ?? toolName;
+    const resolvedToolNotes =
+      selectedFirearmTool?.notes ?? getOptionalString(formData, "toolNotes");
+
     if (id) {
       await requireHuntingEvent(id, user.id);
 
@@ -1693,18 +2299,21 @@ export async function upsertHuntingEventAction(formData: FormData) {
         }),
       );
 
-      if (toolName) {
+      if (resolvedToolName) {
         await withPrismaRetry((prisma) =>
           prisma.huntingEventTool.create({
             data: {
               huntingEventId: id,
+              firearmRecordId: selectedFirearmTool?.firearmRecordId ?? null,
+              firearmBarrelRecordId:
+                selectedFirearmTool?.firearmBarrelRecordId ?? null,
               toolType:
                 (getOptionalString(formData, "toolType") as HuntingToolType) ??
                 HuntingToolType.FIREARM,
-              toolName,
+              toolName: resolvedToolName,
               quantity:
                 activityType === ActivityType.SHOOTING ? null : toolQuantity,
-              notes: getOptionalString(formData, "toolNotes"),
+              notes: resolvedToolNotes,
             },
           }),
         );
@@ -1719,27 +2328,33 @@ export async function upsertHuntingEventAction(formData: FormData) {
         }),
       );
 
-      if (toolName) {
+      if (resolvedToolName) {
         await withPrismaRetry((prisma) =>
           prisma.huntingEventTool.create({
             data: {
               huntingEventId: event.id,
+              firearmRecordId: selectedFirearmTool?.firearmRecordId ?? null,
+              firearmBarrelRecordId:
+                selectedFirearmTool?.firearmBarrelRecordId ?? null,
               toolType:
                 (getOptionalString(formData, "toolType") as HuntingToolType) ??
                 HuntingToolType.FIREARM,
-              toolName,
+              toolName: resolvedToolName,
               quantity:
                 activityType === ActivityType.SHOOTING ? null : toolQuantity,
-              notes: getOptionalString(formData, "toolNotes"),
+              notes: resolvedToolNotes,
             },
           }),
         );
       }
     }
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "活動記録の保存に失敗しました。";
-    redirectWithMessage(pathname, "error", message);
+    console.error("Failed to save hunting event", error);
+    redirectWithMessage(
+      pathname,
+      "error",
+      "活動記録の保存に失敗しました。入力内容を確認してください。",
+    );
   }
 
   revalidateAppPaths("/", "/reports", "/account");
@@ -1837,7 +2452,9 @@ export async function toggleImportedToReportAction(formData: FormData) {
   redirectWithMessage(
     pathname,
     "success",
-    imported ? "未転記に戻しました。" : "転記済みにしました。",
+    imported
+      ? "報告書未記入に戻しました。"
+      : "報告書記入済みにしました。",
   );
 }
 

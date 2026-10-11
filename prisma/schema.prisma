@@ -55,6 +55,11 @@ enum FirearmStatus {
   INACTIVE
 }
 
+enum FirearmInspectionStatus {
+  SCHEDULED
+  COMPLETED
+}
+
 enum FileCategory {
   RENEWAL_DOCUMENT
   LICENSE_COPY
@@ -67,6 +72,9 @@ enum FileCategory {
 enum AmmoRecordType {
   PURCHASE
   CONSUME
+  TRANSFER_IN
+  TRANSFER_OUT
+  DISPOSAL
   ADJUST
   CARRYOVER
 }
@@ -131,6 +139,7 @@ model User {
 
   profile                 UserProfile?
   renewalRecords          RenewalRecord[]
+  firearmInspectionRecords FirearmInspectionRecord[]
   fileRecords             FileRecord[]
   ammoRecords             AmmoRecord[]
   huntingEvents           HuntingEvent[]
@@ -233,6 +242,7 @@ model RenewalRecord {
 
   user          User             @relation(fields: [userId], references: [id], onDelete: Restrict)
   firearmRecords FirearmRecord[]
+  firearmInspectionRecords FirearmInspectionRecord[]
   fileRecords    FileRecord[]
 
   @@index([userId])
@@ -247,6 +257,33 @@ model RenewalRecord {
   @@index([userId, expiresOn, deletedAt])
   @@index([jurisdictionCode, category, deletedAt])
   @@map("renewal_records")
+}
+
+model FirearmInspectionRecord {
+  id              String                   @id @default(cuid())
+  userId          String
+  renewalRecordId String
+  scheduledOn     DateTime
+  status          FirearmInspectionStatus  @default(SCHEDULED)
+  inspectedOn     DateTime?
+  notes           String?
+  completedAt     DateTime?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  deletedAt       DateTime?
+
+  user          User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  renewalRecord RenewalRecord @relation(fields: [renewalRecordId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([renewalRecordId])
+  @@index([status])
+  @@index([scheduledOn])
+  @@index([completedAt])
+  @@index([deletedAt])
+  @@index([userId, deletedAt])
+  @@index([renewalRecordId, status, deletedAt])
+  @@map("firearm_inspection_records")
 }
 
 model FirearmRecord {
@@ -278,6 +315,7 @@ model FirearmRecord {
 
   renewalRecord  RenewalRecord         @relation(fields: [renewalRecordId], references: [id], onDelete: Restrict)
   barrelRecords  FirearmBarrelRecord[]
+  huntingEventTools HuntingEventTool[] @relation("HuntingEventToolFirearm")
 
   @@index([renewalRecordId])
   @@index([firearmType])
@@ -309,6 +347,7 @@ model FirearmBarrelRecord {
   deletedAt       DateTime?
 
   firearmRecord FirearmRecord @relation(fields: [firearmRecordId], references: [id], onDelete: Restrict)
+  huntingEventTools HuntingEventTool[] @relation("HuntingEventToolBarrel")
 
   @@index([firearmRecordId])
   @@index([barrelType])
@@ -353,6 +392,7 @@ model AmmoRecord {
   recordType      AmmoRecordType
   ammoCategory    AmmoCategory
   caliber         String?
+  manufacturer    String?
   quantity        Int
   unit            AmmoUnit       @default(ROUND)
   transactionDate DateTime
@@ -394,6 +434,9 @@ model HuntingEvent {
   shootingType     String?
   shootingRangeName String?
   shotCount        Int?
+  shotShellUsedCount Int?
+  slugUsedCount    Int?
+  airgunPelletUsedCount Int?
   isReportTransferTarget Boolean   @default(true)
   notes            String?
   importedToReportAt DateTime?
@@ -427,6 +470,8 @@ model HuntingEvent {
 model HuntingEventTool {
   id             String          @id @default(cuid())
   huntingEventId String
+  firearmRecordId String?
+  firearmBarrelRecordId String?
   toolType       HuntingToolType
   toolName       String
   quantity       Int?
@@ -436,8 +481,12 @@ model HuntingEventTool {
   deletedAt      DateTime?
 
   huntingEvent HuntingEvent @relation(fields: [huntingEventId], references: [id], onDelete: Restrict)
+  firearmRecord FirearmRecord? @relation("HuntingEventToolFirearm", fields: [firearmRecordId], references: [id], onDelete: Restrict)
+  firearmBarrelRecord FirearmBarrelRecord? @relation("HuntingEventToolBarrel", fields: [firearmBarrelRecordId], references: [id], onDelete: Restrict)
 
   @@index([huntingEventId])
+  @@index([firearmRecordId])
+  @@index([firearmBarrelRecordId])
   @@index([toolType])
   @@index([deletedAt])
   @@index([huntingEventId, deletedAt])

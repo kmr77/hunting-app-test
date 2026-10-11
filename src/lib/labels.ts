@@ -2,6 +2,7 @@ import {
   AmmoCategory,
   AmmoRecordType,
   FirearmStatus,
+  FirearmInspectionStatus,
   FirearmBarrelType,
   FirearmType,
   ActivityType,
@@ -32,8 +33,11 @@ export const renewalStatusLabels: Record<RenewalStatus, string> = {
 
 export const ammoRecordTypeLabels: Record<AmmoRecordType, string> = {
   PURCHASE: "購入",
-  CONSUME: "消費",
-  ADJUST: "調整",
+  CONSUME: "旧消費記録",
+  TRANSFER_IN: "譲受",
+  TRANSFER_OUT: "譲渡",
+  DISPOSAL: "廃棄",
+  ADJUST: "残数調整",
   CARRYOVER: "繰越",
 };
 
@@ -105,9 +109,17 @@ export const firearmStatusLabels: Record<FirearmStatus, string> = {
   INACTIVE: "休止中",
 };
 
+export const firearmInspectionStatusLabels: Record<
+  FirearmInspectionStatus,
+  string
+> = {
+  SCHEDULED: "未実施",
+  COMPLETED: "銃検済み",
+};
+
 export const reportTransferStatusLabels = {
-  imported: "転記済み",
-  pending: "未転記",
+  imported: "報告書記入済み",
+  pending: "報告書未記入",
 } as const;
 
 export const appNavigationItems = [
@@ -127,7 +139,7 @@ export const appNavigationItems = [
     href: "/ammo",
     shortLabel: "実包",
     label: "実包帳簿",
-    description: "購入と消費の流れを管理します。",
+    description: "弾薬情報を管理します。",
   },
   {
     href: "/reports",

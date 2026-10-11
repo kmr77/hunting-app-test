@@ -1,8 +1,6 @@
-import { deleteAmmoAction, upsertAmmoAction } from "@/app/actions";
+import { AmmoCreateForm } from "@/components/ammo/ammo-create-form";
+import { AmmoRecordList } from "@/components/ammo/ammo-record-list";
 import { FeedbackBanner } from "@/components/feedback-banner";
-import { DateInput } from "@/components/date-input";
-import { formFieldBase, formFieldLabel, formLabelText, formTextareaBase, formFieldCompact, formTextareaCompact } from "@/lib/form-classes";
-import { SubmitButton } from "@/components/submit-button";
 import {
   ammoCategoryOptions,
   ammoRecordTypeOptions,
@@ -14,30 +12,37 @@ import {
   getFeedbackFromSearchParams,
   type SearchParamsInput,
 } from "@/lib/feedback";
-import { formatDateInput, formatDateLabel } from "@/lib/format";
 import {
   ammoCategoryLabels,
   ammoRecordTypeLabels,
+  toDisplayLabel,
 } from "@/lib/labels";
+import { formatDateInput } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
+
+function getFirstSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
 
 export default async function AmmoPage({
   searchParams,
 }: {
   searchParams?: Promise<SearchParamsInput>;
 }) {
-  const searchFeedback = await getFeedbackFromSearchParams(await searchParams);
+  const resolvedSearchParams = await searchParams;
+  const searchFeedback = await getFeedbackFromSearchParams(resolvedSearchParams);
+  const feedbackTarget = getFirstSearchParam(resolvedSearchParams?.target);
   let feedback = searchFeedback;
   let ammoRecords: Awaited<ReturnType<typeof getAmmoPageData>>["ammoRecords"] =
     getAmmoPageDataFallback().ammoRecords as Awaited<
       ReturnType<typeof getAmmoPageData>
     >["ammoRecords"];
-  let balance: Awaited<ReturnType<typeof getAmmoPageData>>["balance"] =
-    getAmmoPageDataFallback().balance;
+  let registeredCount: Awaited<ReturnType<typeof getAmmoPageData>>["registeredCount"] =
+    getAmmoPageDataFallback().registeredCount;
 
   try {
-    ({ ammoRecords, balance } = await getAmmoPageData());
+    ({ ammoRecords, registeredCount } = await getAmmoPageData());
   } catch (error) {
     feedback ??= {
       variant: "error",
@@ -56,19 +61,22 @@ export default async function AmmoPage({
               実包帳簿
             </p>
             <h2 className="text-2xl font-semibold text-slate-950">
-              実包の購入と消費を日付順に管理
+              実包の購入・譲受を日付順に管理
             </h2>
             <p className="max-w-2xl text-sm leading-7 text-slate-600">
-              仕入先や用途を残しながら、散弾実包やスラッグの残数を確認できます。
+              仕入先や弾薬の特徴を残しながら、活動記録で使う弾薬情報を整理できます。
+            </p>
+            <p className="max-w-2xl rounded-[18px] bg-emerald-50/80 px-4 py-3 text-sm leading-7 text-emerald-950">
+              活動記録での入力を楽にするため、メーカー・口径・号数・弾種などはできるだけ詳しく登録しておくことをおすすめします。
             </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:min-w-80">
             <div className="rounded-[24px] bg-lime-100 p-4 text-lime-950">
               <p className="text-xs font-semibold tracking-[0.16em] uppercase">
-                現在残数
+                登録弾数
               </p>
-              <p className="mt-2 text-3xl font-semibold">{balance} 発</p>
+              <p className="mt-2 text-3xl font-semibold">{registeredCount} 発</p>
             </div>
             <div className="rounded-[24px] bg-slate-100 p-4">
               <p className="text-xs font-semibold tracking-[0.16em] text-slate-500 uppercase">
@@ -83,209 +91,41 @@ export default async function AmmoPage({
       </section>
 
       <section className="grid gap-4">
-        <form
-          action={upsertAmmoAction}
-          className="rounded-[30px] border border-emerald-950/10 bg-white/92 p-5 shadow-[0_24px_50px_-36px_rgba(15,23,42,0.38)]"
-        >
-          <div className="mb-4">
-            <p className="text-[11px] font-semibold tracking-[0.22em] text-slate-500 uppercase">
-              新規登録
-            </p>
-            <h3 className="mt-1 text-lg font-semibold">帳簿に記録を追加</h3>
-          </div>
+        <AmmoCreateForm
+          recordTypeOptions={ammoRecordTypeOptions.map((option) => ({
+            value: option,
+            label: toDisplayLabel(option, ammoRecordTypeLabels),
+          }))}
+          ammoCategoryOptions={ammoCategoryOptions.map((option) => ({
+            value: option,
+            label: ammoCategoryLabels[option],
+          }))}
+        />
 
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
-            <label className={formFieldLabel}>
-              <span className={formLabelText}>日付</span>
-              <DateInput
-                name="transactionDate"
-                required
-                className={formFieldBase}
-              />
-            </label>
-
-            <label className={formFieldLabel}>
-              <span className={formLabelText}>記録区分</span>
-              <select
-                name="recordType"
-                defaultValue="PURCHASE"
-                className={formFieldBase}
-              >
-                {ammoRecordTypeOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {ammoRecordTypeLabels[option]}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className={formFieldLabel}>
-              <span className={formLabelText}>実包種別</span>
-              <select
-                name="ammoCategory"
-                defaultValue="SHOT_SHELL"
-                className={formFieldBase}
-              >
-                {ammoCategoryOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {ammoCategoryLabels[option]}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className={formFieldLabel}>
-              <span className={formLabelText}>数量</span>
-              <input
-                type="number"
-                name="quantity"
-                min={1}
-                required
-                defaultValue={25}
-                className={formFieldBase}
-              />
-            </label>
-
-            <label className={formFieldLabel}>
-              <span className={formLabelText}>口径</span>
-              <input
-                name="caliber"
-                placeholder="例: 12番"
-                className={formFieldBase}
-              />
-            </label>
-
-            <label className={formFieldLabel + " lg:col-span-2"}>
-              <span className={formLabelText}>仕入先</span>
-              <input
-                name="supplierName"
-                placeholder="例: 地元銃砲店"
-                className={formFieldBase}
-              />
-            </label>
-
-            <label className={formFieldLabel + " lg:col-span-4"}>
-              <span className={formLabelText}>メモ</span>
-              <textarea
-                name="memo"
-                rows={3}
-                placeholder="購入理由、消費の用途など"
-                className={formTextareaBase}
-              />
-            </label>
-          </div>
-
-          <SubmitButton
-            className="mt-5 min-h-12 w-full px-5"
-            pendingChildren="保存中..."
-          >
-            帳簿に保存
-          </SubmitButton>
-        </form>
-
-        <section className="grid gap-4">
-          {ammoRecords.length === 0 ? (
-            <div className="rounded-[30px] border border-dashed border-emerald-950/15 bg-white/72 p-6 text-sm leading-7 text-slate-600">
-              実包帳簿はまだ登録されていません。最初に現在の残弾数を繰越として登録すると、購入・消費の流れを管理しやすくなります。
-            </div>
-          ) : (
-            ammoRecords.map((record) => (
-              <article
-                key={record.id}
-                className="rounded-[30px] border border-emerald-950/10 bg-white/92 p-5 shadow-[0_24px_50px_-36px_rgba(15,23,42,0.38)]"
-              >
-                <form action={upsertAmmoAction} className="grid gap-3">
-                  <input type="hidden" name="id" value={record.id} />
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="space-y-1">
-                      <p className="text-xs font-semibold tracking-[0.16em] text-slate-500 uppercase">
-                        {ammoRecordTypeLabels[record.recordType]}
-                      </p>
-                      <h3 className="text-lg font-semibold text-slate-950">
-                        {ammoCategoryLabels[record.ammoCategory]} / {record.quantity} 発
-                      </h3>
-                      <p className="text-sm text-slate-600">
-                        {formatDateLabel(record.transactionDate)}
-                      </p>
-                    </div>
-                    <span className="inline-flex rounded-full bg-lime-100 px-3 py-1 text-xs font-medium text-lime-950">
-                      {record.caliber ?? "口径未設定"}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
-                    <DateInput
-                      name="transactionDate"
-                      required
-                      defaultValue={formatDateInput(record.transactionDate)}
-                      className={formFieldCompact}
-                    />
-                    <select
-                      name="recordType"
-                      defaultValue={record.recordType}
-                      className={formFieldCompact}
-                    >
-                      {ammoRecordTypeOptions.map((option) => (
-                        <option key={option} value={option}>
-                          {ammoRecordTypeLabels[option]}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      name="ammoCategory"
-                      defaultValue={record.ammoCategory}
-                      className={formFieldCompact}
-                    >
-                      {ammoCategoryOptions.map((option) => (
-                        <option key={option} value={option}>
-                          {ammoCategoryLabels[option]}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      type="number"
-                      min={1}
-                      required
-                      name="quantity"
-                      defaultValue={record.quantity}
-                      className={formFieldCompact}
-                    />
-                    <input
-                      name="caliber"
-                      defaultValue={record.caliber ?? ""}
-                      placeholder="口径"
-                      className={formFieldCompact}
-                    />
-                    <input
-                      name="supplierName"
-                      defaultValue={record.supplierName ?? ""}
-                      placeholder="仕入先"
-                      className={formFieldCompact}
-                    />
-                    <textarea
-                      name="memo"
-                      rows={2}
-                      defaultValue={record.memo ?? ""}
-                      placeholder="メモ"
-                      className={formTextareaCompact}
-                    />
-                  </div>
-
-                  <SubmitButton pendingChildren="更新中...">
-                    内容を更新
-                  </SubmitButton>
-                </form>
-
-                <form action={deleteAmmoAction} className="mt-3">
-                  <input type="hidden" name="id" value={record.id} />
-                  <SubmitButton variant="danger" pendingChildren="削除中...">
-                    この記録を削除
-                  </SubmitButton>
-                </form>
-              </article>
-            ))
-          )}
-        </section>
+        <AmmoRecordList
+          records={ammoRecords.map((record) => ({
+            id: record.id,
+            recordType: record.recordType,
+            ammoCategory: record.ammoCategory,
+            caliber: record.caliber,
+            manufacturer: record.manufacturer,
+            shotSize: record.slipNumber,
+            quantity: record.quantity,
+            transactionDate: formatDateInput(record.transactionDate),
+            supplierName: record.supplierName,
+            memo: record.memo,
+          }))}
+          recordTypeOptions={ammoRecordTypeOptions.map((option) => ({
+            value: option,
+            label: toDisplayLabel(option, ammoRecordTypeLabels),
+          }))}
+          ammoCategoryOptions={ammoCategoryOptions.map((option) => ({
+            value: option,
+            label: ammoCategoryLabels[option],
+          }))}
+          feedback={feedback}
+          feedbackTarget={feedbackTarget}
+        />
       </section>
     </main>
   );

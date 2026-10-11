@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { formFieldCompact, formFieldLabel, formLabelText, formTextareaCompact } from "@/lib/form-classes";
+import {
+  formFieldCompact,
+  formFieldLabel,
+  formGrid4,
+  formLabelText,
+  formTextareaCompact,
+} from "@/lib/form-classes";
 
 const barrelTypeOptions = [
   { value: "RIFLED", label: "ライフル銃身" },
@@ -33,7 +39,7 @@ export function FirearmBarrelFields() {
         {rows.map((row, index) => (
           <div
             key={row.id}
-            className="grid grid-cols-1 gap-3 rounded-[20px] border border-emerald-950/10 bg-emerald-50/50 p-3 lg:grid-cols-4"
+            className={`${formGrid4} rounded-[20px] border border-emerald-950/10 bg-emerald-50/50 p-3`}
           >
             <label className={formFieldLabel}>
               <span className={formLabelText}>銃身種別</span>

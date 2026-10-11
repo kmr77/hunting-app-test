@@ -1,6 +1,12 @@
 import { DateInput } from "@/components/date-input";
 import { FieldError } from "@/components/field-error";
-import { formFieldCompact, formFieldLabel, formLabelText } from "@/lib/form-classes";
+import {
+  formFieldCompact,
+  formFieldLabel,
+  formGrid2,
+  formGrid4,
+  formLabelText,
+} from "@/lib/form-classes";
 
 type GunPermitFieldsProps = {
   defaultOriginalPermitNumber?: string | null;
@@ -31,7 +37,8 @@ export function GunPermitFields({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+      <div className="grid gap-3">
+        <div className={formGrid4}>
         <label className={formFieldLabel}>
           <span className={formLabelText}>最初の許可番号</span>
           <span className="flex min-w-0 items-center rounded-[18px] border border-slate-200 bg-slate-50">
@@ -79,7 +86,9 @@ export function GunPermitFields({
           />
           <FieldError error={errors.applicationStartOn} />
         </label>
+        </div>
 
+        <div className={formGrid2}>
         <label className={formFieldLabel}>
           <span className={formLabelText}>更新申請期間終了日</span>
           <DateInput
@@ -90,7 +99,7 @@ export function GunPermitFields({
           <FieldError error={errors.applicationEndOn} />
         </label>
 
-        <label className={formFieldLabel + " lg:col-span-2"}>
+        <label className={formFieldLabel}>
           <span className={formLabelText}>有効期間</span>
           <input
             name="validityDescription"
@@ -99,6 +108,7 @@ export function GunPermitFields({
             className={formFieldCompact}
           />
         </label>
+        </div>
       </div>
     </section>
   );

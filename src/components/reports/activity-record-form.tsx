@@ -5,9 +5,9 @@ import {
   ActivityType,
   HuntingMethod,
   HuntingPurpose,
-  HuntingToolType,
 } from "@prisma/client";
 import { upsertHuntingEventAction } from "@/app/actions";
+import type { FirearmToolOption } from "@/lib/app-data";
 import { DateInput } from "@/components/date-input";
 import { ReportLocationFields } from "@/components/reports/report-location-fields";
 import { SubmitButton } from "@/components/submit-button";
@@ -15,12 +15,13 @@ import {
   activityTypeLabels,
   huntingMethodLabels,
   huntingPurposeLabels,
-  huntingToolTypeLabels,
 } from "@/lib/labels";
 import {
   formFieldBase,
   formFieldCompact,
   formFieldLabel,
+  formGrid3,
+  formGrid4,
   formLabelText,
   formTextareaBase,
 } from "@/lib/form-classes";
@@ -38,13 +39,6 @@ const huntingPurposeOptions = [
   HuntingPurpose.TRAINING,
   HuntingPurpose.OTHER,
 ];
-const huntingToolTypeOptions = [
-  HuntingToolType.FIREARM,
-  HuntingToolType.TRAP,
-  HuntingToolType.DOG,
-  HuntingToolType.VEHICLE,
-  HuntingToolType.OTHER,
-];
 const shootingTypeOptions = [
   "標的射撃",
   "射撃練習",
@@ -55,14 +49,225 @@ const shootingTypeOptions = [
 
 type ActivityRecordFormProps = {
   municipalitySuggestionsByPrefecture: Record<string, string[]>;
+  ammoBalance: AmmoBalance;
+  firearmToolOptions: FirearmToolOption[];
 };
+
+type AmmoBalance = {
+  shotShell: number;
+  slug: number;
+  airgunPellet: number;
+};
+
+type AmmoUsageInput = {
+  shotShellUsedCount: number;
+  slugUsedCount: number;
+  airgunPelletUsedCount: number;
+};
+
+function toSafeCount(value: string) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function formatBalance(balance: AmmoBalance) {
+  return `散弾 ${balance.shotShell}発　単弾 ${balance.slug}発　空気銃弾 ${balance.airgunPellet}発`;
+}
+
+function AmmoBalancePanel({
+  balance,
+  usage,
+}: {
+  balance: AmmoBalance;
+  usage: AmmoUsageInput;
+}) {
+  const projected = {
+    shotShell: balance.shotShell - usage.shotShellUsedCount,
+    slug: balance.slug - usage.slugUsedCount,
+    airgunPellet: balance.airgunPellet - usage.airgunPelletUsedCount,
+  };
+  const warnings = [
+    projected.shotShell < 0
+      ? "散弾の使用数が記録上の残弾数を超えています。入力内容を確認してください。"
+      : null,
+    projected.slug < 0
+      ? "単弾の使用数が記録上の残弾数を超えています。入力内容を確認してください。"
+      : null,
+    projected.airgunPellet < 0
+      ? "空気銃弾の使用数が記録上の残弾数を超えています。入力内容を確認してください。"
+      : null,
+  ].filter(Boolean);
+
+  return (
+    <div className="mb-5 rounded-[24px] border border-emerald-950/10 bg-white/82 p-4 text-sm leading-7 text-slate-700">
+      <p className="font-semibold text-slate-950">
+        残弾数：{formatBalance(balance)}
+      </p>
+      <p className="mt-1 text-slate-600">
+        保存後見込み：{formatBalance(projected)}
+      </p>
+      {warnings.length > 0 ? (
+        <div className="mt-3 rounded-[18px] border border-amber-200 bg-amber-50 p-3 text-amber-900">
+          {warnings.map((warning) => (
+            <p key={warning}>{warning}</p>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function AmmoUsageFields({
+  usage,
+  onUsageChange,
+}: {
+  usage: AmmoUsageInput;
+  onUsageChange: (key: keyof AmmoUsageInput, value: string) => void;
+}) {
+  return (
+    <>
+      <label className={formFieldLabel}>
+        <span className={formLabelText}>散弾使用数</span>
+        <input
+          type="number"
+          min={0}
+          name="shotShellUsedCount"
+          value={usage.shotShellUsedCount}
+          onChange={(event) =>
+            onUsageChange("shotShellUsedCount", event.target.value)
+          }
+          className={formFieldBase}
+        />
+      </label>
+      <label className={formFieldLabel}>
+        <span className={formLabelText}>単弾使用数</span>
+        <input
+          type="number"
+          min={0}
+          name="slugUsedCount"
+          value={usage.slugUsedCount}
+          onChange={(event) => onUsageChange("slugUsedCount", event.target.value)}
+          className={formFieldBase}
+        />
+      </label>
+      <label className={formFieldLabel}>
+        <span className={formLabelText}>空気銃弾使用数</span>
+        <input
+          type="number"
+          min={0}
+          name="airgunPelletUsedCount"
+          value={usage.airgunPelletUsedCount}
+          onChange={(event) =>
+            onUsageChange("airgunPelletUsedCount", event.target.value)
+          }
+          className={formFieldBase}
+        />
+      </label>
+    </>
+  );
+}
+
+function FirearmToolSelector({
+  options,
+  selectedValue,
+  onSelect,
+}: {
+  options: FirearmToolOption[];
+  selectedValue: string;
+  onSelect: (value: string) => void;
+}) {
+  const selectedTool = options.find((option) => option.value === selectedValue);
+
+  if (options.length === 0) {
+    return (
+      <div className="rounded-[22px] border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-900">
+        使用できる登録済み銃・銃身がありません。先に更新管理で銃本体と銃身情報を登録してください。
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-3 rounded-[22px] border border-emerald-950/10 bg-white/82 p-4">
+      <label className={formFieldLabel}>
+        <span className={formLabelText}>使用道具</span>
+        <select
+          name="firearmToolSelection"
+          value={selectedValue}
+          onChange={(event) => onSelect(event.target.value)}
+          className={formFieldBase}
+        >
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {selectedTool ? (
+        <div className={`${formGrid3} rounded-[18px] bg-slate-50 p-3 text-sm leading-7 text-slate-700`}>
+          <p>
+            <span className="font-semibold text-slate-500">口径：</span>
+            <span className="font-semibold text-slate-950">
+              {selectedTool.caliberLabel}
+            </span>
+          </p>
+          <p>
+            <span className="font-semibold text-slate-500">使用弾分類：</span>
+            <span className="font-semibold text-slate-950">
+              {selectedTool.ammoUsageLabel}
+            </span>
+          </p>
+          <p className="md:col-span-2 lg:col-span-3">
+            推奨：{selectedTool.ammoUsageLabel}使用数に入力してください。
+            {selectedTool.detailLabel ? ` ${selectedTool.detailLabel}` : ""}
+          </p>
+        </div>
+      ) : null}
+
+      <input
+        type="hidden"
+        name="firearmRecordId"
+        value={selectedTool?.firearmRecordId ?? ""}
+      />
+      <input
+        type="hidden"
+        name="firearmBarrelRecordId"
+        value={selectedTool?.firearmBarrelRecordId ?? ""}
+      />
+      <input type="hidden" name="toolType" value="FIREARM" />
+      <input type="hidden" name="toolName" value={selectedTool?.label ?? ""} />
+      <input
+        type="hidden"
+        name="toolNotes"
+        value={selectedTool ? `使用弾分類: ${selectedTool.ammoUsageLabel}` : ""}
+      />
+    </div>
+  );
+}
 
 export function ActivityRecordForm({
   municipalitySuggestionsByPrefecture,
+  ammoBalance,
+  firearmToolOptions,
 }: ActivityRecordFormProps) {
   const [activityType, setActivityType] = useState<ActivityType>(
     ActivityType.HUNTING,
   );
+  const [usage, setUsage] = useState<AmmoUsageInput>({
+    shotShellUsedCount: 0,
+    slugUsedCount: 0,
+    airgunPelletUsedCount: 0,
+  });
+  const [selectedToolValue, setSelectedToolValue] = useState(
+    firearmToolOptions[0]?.value ?? "",
+  );
+  const handleUsageChange = (key: keyof AmmoUsageInput, value: string) => {
+    setUsage((current) => ({
+      ...current,
+      [key]: toSafeCount(value),
+    }));
+  };
   const isHunting = activityType === ActivityType.HUNTING;
   const formToneClass = isHunting
     ? "border-emerald-900/15 bg-emerald-50/80"
@@ -103,16 +308,17 @@ export function ActivityRecordForm({
                 : "text-slate-600 hover:bg-white hover:text-slate-950"
             }`}
           >
-            {activityTypeLabels[option]}
+          {activityTypeLabels[option]}
           </button>
         ))}
       </div>
+      <AmmoBalancePanel balance={ammoBalance} usage={usage} />
       <input type="hidden" name="activityType" value={activityType} />
 
       {isHunting ? (
         <>
           <div
-            className={`report-form-grid grid grid-cols-1 gap-3 rounded-[26px] border p-4 lg:grid-cols-4 ${innerToneClass}`}
+            className={`report-form-grid ${formGrid4} rounded-[26px] border p-4 ${innerToneClass}`}
           >
             <label className={formFieldLabel}>
               <span className={formLabelText}>実施日</span>
@@ -189,6 +395,11 @@ export function ActivityRecordForm({
                 className={formTextareaBase}
               />
             </label>
+
+            <AmmoUsageFields
+              usage={usage}
+              onUsageChange={handleUsageChange}
+            />
           </div>
 
           <div className="mt-5 rounded-[24px] border border-emerald-950/10 bg-white/78 p-4">
@@ -197,44 +408,19 @@ export function ActivityRecordForm({
                 使用道具 1件
               </p>
               <p className="text-xs leading-6 text-slate-600">
-                MVP では最初の1件だけを登録・更新します。
+                更新管理に登録した銃本体・銃身情報から選択します。口径は選択内容から自動表示します。
               </p>
             </div>
-            <div className="report-tool-grid grid grid-cols-1 gap-3 lg:grid-cols-4">
-              <select
-                name="toolType"
-                defaultValue="FIREARM"
-                className={formFieldCompact}
-              >
-                {huntingToolTypeOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {huntingToolTypeLabels[option]}
-                  </option>
-                ))}
-              </select>
-              <input
-                name="toolName"
-                placeholder="例: 12番散弾銃"
-                className={formFieldCompact}
-              />
-              <input
-                type="number"
-                min={0}
-                name="toolQuantity"
-                defaultValue={1}
-                className={formFieldCompact}
-              />
-              <input
-                name="toolNotes"
-                placeholder="道具メモ"
-                className={formFieldCompact}
-              />
-            </div>
+            <FirearmToolSelector
+              options={firearmToolOptions}
+              selectedValue={selectedToolValue}
+              onSelect={setSelectedToolValue}
+            />
           </div>
         </>
       ) : (
         <div
-          className={`report-form-grid grid grid-cols-1 gap-3 rounded-[26px] border p-4 lg:grid-cols-4 ${innerToneClass}`}
+          className={`report-form-grid ${formGrid4} rounded-[26px] border p-4 ${innerToneClass}`}
         >
           <label className={formFieldLabel}>
             <span className={formLabelText}>実施日</span>
@@ -267,27 +453,33 @@ export function ActivityRecordForm({
             />
           </label>
 
-          <label className={formFieldLabel + " lg:col-span-2"}>
-            <span className={formLabelText}>使用銃</span>
+          <div className="lg:col-span-4">
+            <FirearmToolSelector
+              options={firearmToolOptions}
+              selectedValue={selectedToolValue}
+              onSelect={setSelectedToolValue}
+            />
+          </div>
+
+          <label className={formFieldLabel}>
+            <span className={formLabelText}>使用弾数合計</span>
             <input
-              name="toolName"
-              required
-              placeholder="例: レミントン M870"
+              type="number"
+              min={0}
+              value={
+                usage.shotShellUsedCount +
+                usage.slugUsedCount +
+                usage.airgunPelletUsedCount
+              }
+              readOnly
               className={formFieldBase}
             />
           </label>
 
-          <label className={formFieldLabel}>
-            <span className={formLabelText}>使用弾数</span>
-            <input
-              type="number"
-              min={0}
-              name="shotCount"
-              required
-              defaultValue={0}
-              className={formFieldBase}
-            />
-          </label>
+          <AmmoUsageFields
+            usage={usage}
+            onUsageChange={handleUsageChange}
+          />
 
           <label className={formFieldLabel + " lg:col-span-4"}>
             <span className={formLabelText}>メモ</span>

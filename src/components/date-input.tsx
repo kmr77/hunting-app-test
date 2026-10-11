@@ -3,7 +3,10 @@
 import { useMemo, useState, type ChangeEvent, type InputHTMLAttributes } from "react";
 import { formatJapaneseEraDate, isValidCompactDateInput } from "@/lib/format";
 
-type DateInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type">;
+type DateInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & {
+  exampleText?: string;
+  placeholderText?: string;
+};
 
 function normalizeCompactDateText(value: string) {
   return value
@@ -30,6 +33,8 @@ function toEightDigitDate(value: InputHTMLAttributes<HTMLInputElement>["value"])
 export function DateInput({
   className,
   defaultValue,
+  exampleText = "例: 1980年1月1日の場合は 19800101 と入力してください。",
+  placeholderText = "例: 19800101",
   value,
   onChange,
   ...rest
@@ -63,14 +68,14 @@ export function DateInput({
         inputMode="numeric"
         maxLength={8}
         pattern="[0-9]{8}"
-        placeholder="例: 19800101"
+        placeholder={placeholderText}
         className={className}
         value={currentValue}
         onChange={handleChange}
         {...rest}
       />
       <span className="text-xs leading-5 text-slate-500">
-        例: 1980年1月1日の場合は 19800101 と入力してください。
+        {exampleText}
       </span>
       {confirmationText ? (
         <span className="text-xs leading-5 text-slate-600">

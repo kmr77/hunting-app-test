@@ -2,23 +2,37 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import {
   calculateGunLicenseExpiresOn,
   calculateHuntingLicenseExpiresOn,
+  formatDateInput,
+  formatDateLabel,
   formatJapaneseEraDate,
 } from "@/lib/format";
 import {
+  completeFirearmInspectionAction,
   createFirearmBarrelRecordAction,
   deleteSelectedFirearmBarrelRecordsAction,
   deleteFirearmRecordAction,
+  reopenFirearmInspectionAction,
   setPrimaryFirearmBarrelRecordAction,
+  updateCompletedFirearmInspectionAction,
   updateFirearmBarrelRecordAction,
   updateFirearmRecordAction,
   updateHuntingLicenseInfoAction,
   updateRenewalPermitInfoAction,
+  upsertFirearmInspectionScheduleAction,
 } from "@/app/actions";
 import { DateInput } from "@/components/date-input";
-import { formFieldCompact, formTextareaCompact, formFieldLabel, formLabelText } from "@/lib/form-classes";
+import {
+  formFieldCompact,
+  formFieldLabel,
+  formGrid2,
+  formGrid4,
+  formLabelText,
+  formTextareaCompact,
+} from "@/lib/form-classes";
 
 type Item = { label: string; value: string | null | undefined };
 type Barrel = {
@@ -58,6 +72,15 @@ type Firearm = {
   notes?: string | null;
   barrelRecords: Barrel[];
 };
+type FirearmInspection = {
+  id: string;
+  scheduledOn: string;
+  status: "SCHEDULED" | "COMPLETED";
+  statusLabel: string;
+  inspectedOn?: string;
+  notes?: string | null;
+  completedAt?: string;
+};
 type Renewal = {
   id: string;
   category: string;
@@ -76,6 +99,7 @@ type Renewal = {
   validityDescription?: string | null;
   notes?: string | null;
   firearmRecords: Firearm[];
+  firearmInspectionRecords: FirearmInspection[];
 };
 
 function display(value: string | null | undefined) {
@@ -90,13 +114,45 @@ function displayDate(value: string | null | undefined) {
   return value ? formatJapaneseEraDate(value) : "未登録";
 }
 
+function displayDateWithEra(value: string | null | undefined) {
+  return value
+    ? `${formatDateLabel(value)}（${formatJapaneseEraDate(value).replace(/（.*）$/, "")}）`
+    : "未登録";
+}
+
+function todayInputValue() {
+  return formatDateInput(new Date());
+}
+
+const firearmInspectionDateInputHelp =
+  "例: 2026年1月1日の場合は 20260101 と入力してください。";
+
+function daysUntil(value: string) {
+  const target = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(target.getTime())) {
+    return null;
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.ceil((target.getTime() - today.getTime()) / 86_400_000);
+}
+
+function isOverdueInspection(value: string) {
+  const remainingDays = daysUntil(value);
+  return remainingDays !== null && remainingDays < 0;
+}
+
 function FieldGrid({ items }: { items: Item[] }) {
   return (
-    <dl className="grid grid-cols-1 gap-3 text-sm lg:grid-cols-4">
+    <dl className="grid grid-cols-1 gap-x-8 gap-y-4 text-sm md:grid-cols-2 xl:grid-cols-3">
       {items.map((item) => (
-        <div key={item.label} className="min-w-0 rounded-[18px] bg-slate-50 p-3">
-          <dt className="text-xs font-semibold text-slate-500">{item.label}</dt>
-          <dd className="mt-1 font-semibold text-slate-950">{display(item.value)}</dd>
+        <div key={item.label} className="min-w-0 border-b border-slate-100 pb-3">
+          <dt className="text-xs font-semibold leading-5 text-slate-500">
+            {item.label}
+          </dt>
+          <dd className="mt-1 break-words font-semibold leading-6 text-slate-950">
+            {display(item.value)}
+          </dd>
         </div>
       ))}
     </dl>
@@ -131,6 +187,10 @@ function Note() {
     </p>
   );
 }
+
+const softSectionClass =
+  "border-t border-slate-200 pt-6 first:border-t-0 first:pt-0";
+const inlinePanelClass = "border-t border-slate-200 pt-4";
 
 function ActionFeedback({
   state,
@@ -171,18 +231,33 @@ function ActionFeedback({
   );
 }
 
+function getRenewalTitle(renewal: Renewal) {
+  return renewal.category === "GUN_LICENSE"
+    ? "銃砲所持許可 更新管理"
+    : "狩猟免許（狩猟免状） 更新管理";
+}
+
+function getRenewalCategoryLabel(renewal: Renewal) {
+  return renewal.category === "GUN_LICENSE"
+    ? "銃砲所持許可"
+    : "狩猟免許（狩猟免状）";
+}
+
 export function RenewalRecordCard({
   renewal,
   userBirthDate,
+  children,
 }: {
   renewal: Renewal;
   userBirthDate: string;
+  children?: ReactNode;
 }) {
   const router = useRouter();
   const firearm = renewal.firearmRecords[0];
   const actualPrimaryBarrelId =
     firearm?.barrelRecords.find((barrel) => barrel.isPrimary)?.id ?? "";
   const [editing, setEditing] = useState<"permit" | "firearm" | string | null>(null);
+  const [expanded, setExpanded] = useState(false);
   const [selectedBarrelIds, setSelectedBarrelIds] = useState<string[]>([]);
   const [primaryBarrelId, setPrimaryBarrelId] = useState(actualPrimaryBarrelId);
   const [permitOriginalPermittedOn, setPermitOriginalPermittedOn] = useState(
@@ -240,10 +315,74 @@ export function RenewalRecordCard({
     setPrimaryBarrelId(actualPrimaryBarrelId);
   }, [actualPrimaryBarrelId, primaryBarrelState, router]);
 
+  const accordionPanelId = `renewal-details-${renewal.id}`;
+  const isGunLicense = renewal.category === "GUN_LICENSE";
+  const nextInspection = isGunLicense
+    ? renewal.firearmInspectionRecords
+        .filter((inspection) => inspection.status === "SCHEDULED")
+        .sort((a, b) => a.scheduledOn.localeCompare(b.scheduledOn))[0] ?? null
+    : null;
+  const summaryItems = [
+    { label: "種別", value: getRenewalCategoryLabel(renewal) },
+    { label: "有効期限", value: displayDate(renewal.expiresOn) },
+    { label: "状態", value: renewal.statusLabel },
+    ...(isGunLicense
+      ? [
+          { label: "銃本体", value: `${renewal.firearmRecords.length}丁` },
+          {
+            label: "銃検",
+            value: nextInspection
+              ? `${displayDate(nextInspection.scheduledOn)} / ${nextInspection.statusLabel}`
+              : "未登録",
+          },
+        ]
+      : []),
+  ];
+
   return (
-    <div className="grid gap-4">
+    <article className="overflow-hidden rounded-[30px] border border-emerald-950/10 bg-white/92 shadow-[0_20px_46px_-36px_rgba(15,23,42,0.36)]">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={accordionPanelId}
+        onClick={() => setExpanded((current) => !current)}
+        className="flex w-full flex-col gap-3 px-4 py-4 text-left transition-colors hover:bg-emerald-50/70 sm:px-5"
+      >
+        <span className="flex min-w-0 items-start justify-between gap-4">
+          <span className="min-w-0">
+            <span className="text-xs font-semibold tracking-[0.16em] text-emerald-700 uppercase">
+              登録済み
+            </span>
+            <span className="mt-1 block break-words text-base font-bold text-slate-950">
+              {expanded ? "－" : "＋"} {getRenewalTitle(renewal)}
+            </span>
+          </span>
+          <span className="shrink-0 rounded-full border border-emerald-950/10 bg-white px-3 py-1 text-xs font-bold text-emerald-800">
+            {expanded ? "閉じる" : "開く"}
+          </span>
+        </span>
+        <span className="grid w-full min-w-0 grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-5">
+          {summaryItems.map((item) => (
+            <span
+              key={item.label}
+              className="min-w-0 rounded-[16px] bg-slate-50 px-3 py-2"
+            >
+              <span className="block text-xs font-semibold text-slate-500">
+                {item.label}
+              </span>
+              <span className="mt-1 block break-words font-semibold text-slate-950">
+                {item.value}
+              </span>
+            </span>
+          ))}
+        </span>
+      </button>
+
+      {expanded ? (
+        <div id={accordionPanelId} className="border-t border-emerald-950/10 p-4 sm:p-5">
+          <div className="grid gap-6">
       {renewal.category === "HUNTING_LICENSE" ? (
-        <section className="rounded-[24px] border border-emerald-950/10 bg-white/80 p-4">
+        <section className={softSectionClass}>
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-slate-900">
@@ -271,7 +410,7 @@ export function RenewalRecordCard({
               />
               <input type="hidden" name="id" value={renewal.id} />
               <input type="hidden" name="status" value={renewal.status} />
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+              <div className={formGrid2}>
                 <label className={formFieldLabel}>
                   <span className={formLabelText}>交付日</span>
                   <DateInput
@@ -292,7 +431,7 @@ export function RenewalRecordCard({
                     保存時に交付日の年 + 3年の9月14日として再計算します。
                   </p>
                 </div>
-                <label className={formFieldLabel + " lg:col-span-4"}>
+                <label className={formFieldLabel + " lg:col-span-2"}>
                   <span className={formLabelText}>メモ</span>
                   <textarea
                     name="notes"
@@ -317,7 +456,7 @@ export function RenewalRecordCard({
           )}
         </section>
       ) : (
-      <section className="rounded-[24px] border border-emerald-950/10 bg-white/80 p-4">
+      <section className={softSectionClass}>
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-slate-900">銃砲所持許可証情報</p>
@@ -344,7 +483,7 @@ export function RenewalRecordCard({
             <input type="hidden" name="id" value={renewal.id} />
             <input type="hidden" name="status" value={renewal.status} />
             <Note />
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+            <div className={formGrid4}>
               <label className={formFieldLabel}><span className={formLabelText}>許可日</span><DateInput name="originalPermittedOn" value={permitOriginalPermittedOn} onChange={(event) => handlePermitOriginalPermittedOnChange(event.target.value)} className={formFieldCompact} /></label>
               <label className={formFieldLabel}><span className={formLabelText}>交付日</span><DateInput name="issuedOn" defaultValue={renewal.issuedOn} className={formFieldCompact} /></label>
               <div className="min-w-0 space-y-1.5 rounded-[18px] border border-emerald-950/10 bg-emerald-50/70 p-3 text-sm"><span className={formLabelText}>有効期限日</span><p className="font-semibold text-slate-950">{calculatedPermitExpiresOn ? formatJapaneseEraDate(calculatedPermitExpiresOn) : "許可日と生年月日を入力すると自動表示されます"}</p><p className="text-xs leading-5 text-slate-500">保存時に許可日と利用者本人の生年月日から再計算します。</p></div>
@@ -378,8 +517,15 @@ export function RenewalRecordCard({
       </section>
       )}
 
+      {renewal.category === "GUN_LICENSE" ? (
+        <FirearmInspectionSection
+          renewalRecordId={renewal.id}
+          inspections={renewal.firearmInspectionRecords}
+        />
+      ) : null}
+
       {renewal.category === "GUN_LICENSE" && firearm ? (
-        <section className="rounded-[24px] bg-emerald-50/70 p-4">
+        <section className={softSectionClass}>
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-slate-900">銃本体 1丁</p>
@@ -416,7 +562,7 @@ export function RenewalRecordCard({
             </div>
             {firearm.barrelRecords.length > 0 &&
             !primaryBarrelId ? (
-              <p className="mt-2 rounded-[18px] border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+              <p className="mt-2 border-l-4 border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
                 本銃身が未設定です。銃身カードの「本銃身にする」から1本選択してください。
               </p>
             ) : null}
@@ -484,6 +630,556 @@ export function RenewalRecordCard({
           </div>
         </section>
       ) : null}
+      {children ? (
+        <div className="border-t border-slate-200 pt-6">{children}</div>
+      ) : null}
+          </div>
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function FirearmInspectionSection({
+  renewalRecordId,
+  inspections,
+}: {
+  renewalRecordId: string;
+  inspections: FirearmInspection[];
+}) {
+  const [scheduleState, scheduleAction] = useActionState(
+    upsertFirearmInspectionScheduleAction,
+    null,
+  );
+  const [completeState, completeAction] = useActionState(
+    completeFirearmInspectionAction,
+    null,
+  );
+  const [completedUpdateState, completedUpdateAction] = useActionState(
+    updateCompletedFirearmInspectionAction,
+    null,
+  );
+  const [reopenState, reopenAction] = useActionState(
+    reopenFirearmInspectionAction,
+    null,
+  );
+  const [mode, setMode] = useState<
+    | { type: "new" }
+    | { type: "edit-scheduled"; id: string }
+    | { type: "complete"; id: string }
+    | { type: "edit-completed"; id: string }
+    | null
+  >(null);
+  const [feedbackTarget, setFeedbackTarget] = useState<
+    "schedule" | "complete" | "completed-update" | "reopen" | "keep" | null
+  >(null);
+
+  const scheduledInspections = inspections
+    .filter((inspection) => inspection.status === "SCHEDULED")
+    .sort((a, b) => a.scheduledOn.localeCompare(b.scheduledOn));
+  const nextInspection = scheduledInspections[0] ?? null;
+  const completedInspections = inspections
+    .filter((inspection) => inspection.status === "COMPLETED")
+    .sort((a, b) => b.scheduledOn.localeCompare(a.scheduledOn));
+
+  useEffect(() => {
+    if (
+      scheduleState?.success ||
+      completeState?.success ||
+      completedUpdateState?.success ||
+      reopenState?.success
+    ) {
+      setMode(null);
+    }
+  }, [
+    scheduleState,
+    completeState,
+    completedUpdateState,
+    reopenState,
+  ]);
+
+  return (
+    <section
+      id={`inspection-${renewalRecordId}`}
+      className={softSectionClass}
+    >
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">銃検管理</p>
+          <p className="text-xs leading-6 text-slate-600">
+            銃検予定と完了履歴を銃砲所持許可ごとに残します。
+          </p>
+        </div>
+        {!nextInspection && mode?.type !== "new" ? (
+          <button
+            type="button"
+            onClick={() => setMode({ type: "new" })}
+            className="rounded-full border border-emerald-950/10 bg-white px-4 py-2 text-sm font-semibold text-emerald-900"
+          >
+            銃検予定日を登録
+          </button>
+        ) : null}
+      </div>
+
+      <div className="grid gap-3">
+        {feedbackTarget === "schedule" ? (
+          <ActionFeedback
+            state={scheduleState}
+            successMessage="銃検予定を保存しました。"
+          />
+        ) : null}
+        {feedbackTarget === "complete" ? (
+          <ActionFeedback
+            state={completeState}
+            successMessage="銃検済みに変更しました。"
+          />
+        ) : null}
+        {feedbackTarget === "completed-update" ? (
+          <ActionFeedback
+            state={completedUpdateState}
+            successMessage="銃検記録を更新しました。"
+          />
+        ) : null}
+        {feedbackTarget === "reopen" ? (
+          <ActionFeedback
+            state={reopenState}
+            successMessage="銃検済みを取り消しました。"
+          />
+        ) : null}
+        {feedbackTarget === "keep" ? (
+          <div className="max-w-full overflow-hidden break-words rounded-[18px] border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-950">
+            未実施のまま保持しました。
+          </div>
+        ) : null}
+
+        {nextInspection ? (
+          <InspectionSummary
+            inspection={nextInspection}
+            editing={mode?.type === "edit-scheduled" && mode.id === nextInspection.id}
+            completing={mode?.type === "complete" && mode.id === nextInspection.id}
+            scheduleAction={scheduleAction}
+            completeAction={completeAction}
+            onScheduleSubmit={() => setFeedbackTarget("schedule")}
+            onCompleteSubmit={() => setFeedbackTarget("complete")}
+            onEdit={() =>
+              setMode({ type: "edit-scheduled", id: nextInspection.id })
+            }
+            onComplete={() => {
+              setMode({ type: "complete", id: nextInspection.id });
+            }}
+            onKeepScheduled={() => {
+              setFeedbackTarget("keep");
+              setMode(null);
+            }}
+            onCancel={() => setMode(null)}
+          />
+        ) : mode?.type === "new" ? (
+          <InspectionScheduleForm
+            renewalRecordId={renewalRecordId}
+            action={scheduleAction}
+            onSubmit={() => setFeedbackTarget("schedule")}
+            onCancel={() => setMode(null)}
+          />
+        ) : (
+          <p className="border-t border-dashed border-slate-200 pt-3 text-sm leading-6 text-slate-600">
+            未実施の銃検予定はありません。次回予定が決まったら登録してください。
+          </p>
+        )}
+
+        <div className="grid gap-2">
+          <p className="text-sm font-semibold text-slate-900">銃検履歴</p>
+          {completedInspections.length === 0 ? (
+            <p className="border-t border-slate-200 pt-3 text-sm text-slate-600">
+              銃検済みの履歴はまだありません。
+            </p>
+          ) : (
+            completedInspections.map((inspection) => (
+              <CompletedInspectionCard
+                key={inspection.id}
+                inspection={inspection}
+                editing={
+                  mode?.type === "edit-completed" && mode.id === inspection.id
+                }
+                action={completedUpdateAction}
+                reopenAction={reopenAction}
+                onUpdateSubmit={() => setFeedbackTarget("completed-update")}
+                onReopenSubmit={() => setFeedbackTarget("reopen")}
+                onEdit={() => {
+                  if (
+                    confirm("銃検済みの記録を修正します。よろしいですか？")
+                  ) {
+                    setMode({ type: "edit-completed", id: inspection.id });
+                  }
+                }}
+                onCancel={() => setMode(null)}
+              />
+            ))
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function InspectionStatusLine({ inspection }: { inspection: FirearmInspection }) {
+  const remainingDays = daysUntil(inspection.scheduledOn);
+  if (remainingDays === null) {
+    return null;
+  }
+
+  if (remainingDays < 0) {
+    return (
+      <p className="mt-2 border-l-4 border-red-300 bg-red-50 px-3 py-2 text-sm font-semibold text-red-800">
+        銃検予定日を過ぎています
+      </p>
+    );
+  }
+
+  return (
+    <p className="mt-2 text-sm font-semibold text-emerald-900">
+      {remainingDays === 0 ? "本日が銃検予定日です" : `あと${remainingDays}日`}
+    </p>
+  );
+}
+
+function InspectionSummary({
+  inspection,
+  editing,
+  completing,
+  scheduleAction,
+  completeAction,
+  onScheduleSubmit,
+  onCompleteSubmit,
+  onEdit,
+  onComplete,
+  onKeepScheduled,
+  onCancel,
+}: {
+  inspection: FirearmInspection;
+  editing: boolean;
+  completing: boolean;
+  scheduleAction: (formData: FormData) => void;
+  completeAction: (formData: FormData) => void;
+  onScheduleSubmit: () => void;
+  onCompleteSubmit: () => void;
+  onEdit: () => void;
+  onComplete: () => void;
+  onKeepScheduled: () => void;
+  onCancel: () => void;
+}) {
+  if (editing) {
+    return (
+      <InspectionScheduleForm
+        inspection={inspection}
+        action={scheduleAction}
+        onSubmit={onScheduleSubmit}
+        onCancel={onCancel}
+      />
+    );
+  }
+
+  if (completing) {
+    return (
+      <form
+        action={completeAction}
+        onSubmit={(event) => {
+          if (
+            !confirm(
+              "この銃検を「銃検済み」に変更します。よろしいですか？",
+            )
+          ) {
+            event.preventDefault();
+            return;
+          }
+          onCompleteSubmit();
+        }}
+        className="grid gap-3 border-t border-slate-200 pt-4"
+      >
+        <input type="hidden" name="id" value={inspection.id} />
+        <div className={formGrid2}>
+          <label className={formFieldLabel}>
+            <span className={formLabelText}>銃検実施日</span>
+            <DateInput
+              name="inspectedOn"
+              defaultValue={inspection.scheduledOn || todayInputValue()}
+              exampleText={firearmInspectionDateInputHelp}
+              placeholderText="例: 20260101"
+              className={formFieldCompact}
+            />
+          </label>
+          <label className={formFieldLabel + " lg:col-span-2"}>
+            <span className={formLabelText}>メモ</span>
+            <textarea
+              name="notes"
+              rows={2}
+              defaultValue={inspection.notes ?? ""}
+              className={formTextareaCompact}
+            />
+          </label>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button className="positive-cta min-h-11 rounded-full bg-[#2e7d32] px-5 text-sm font-extrabold !text-white transition-colors hover:bg-[#256528]">
+            銃検終了
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="min-h-11 rounded-full border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700"
+          >
+            キャンセル
+          </button>
+        </div>
+      </form>
+    );
+  }
+
+  const isOverdue = isOverdueInspection(inspection.scheduledOn);
+
+  return (
+    <div className={inlinePanelClass}>
+      <dl className={`${formGrid2} gap-2 text-sm`}>
+        <div>
+          <dt className="text-xs font-semibold text-slate-500">次回銃検予定日</dt>
+          <dd className="font-semibold text-slate-950">
+            {displayDateWithEra(inspection.scheduledOn)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs font-semibold text-slate-500">状態</dt>
+          <dd className="font-semibold text-slate-950">{inspection.statusLabel}</dd>
+        </div>
+        <div className="sm:col-span-2">
+          <dt className="text-xs font-semibold text-slate-500">メモ</dt>
+          <dd className="font-semibold text-slate-950">
+            {display(inspection.notes)}
+          </dd>
+        </div>
+      </dl>
+      {isOverdue ? (
+        <div className="mt-3 border-l-4 border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+          <p className="font-semibold">銃検予定日を過ぎています。</p>
+          <p className="mt-1 font-semibold">銃検は完了しましたか？</p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={onComplete}
+              className="positive-cta min-h-10 rounded-full bg-[#2e7d32] px-4 text-sm font-extrabold !text-white transition-colors hover:bg-[#256528]"
+            >
+              銃検済みにする
+            </button>
+            <button
+              type="button"
+              onClick={onKeepScheduled}
+              className="min-h-10 rounded-full border border-red-200 bg-white px-4 text-sm font-semibold text-red-800"
+            >
+              未実施のままにする
+            </button>
+          </div>
+        </div>
+      ) : (
+        <InspectionStatusLine inspection={inspection} />
+      )}
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+        <button
+          type="button"
+          onClick={onEdit}
+          className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
+        >
+          銃検予定を編集
+        </button>
+        {!isOverdue ? (
+          <button
+            type="button"
+            onClick={onComplete}
+            className="positive-cta min-h-10 rounded-full bg-[#2e7d32] px-4 text-sm font-extrabold !text-white transition-colors hover:bg-[#256528]"
+          >
+            銃検終了
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function InspectionScheduleForm({
+  renewalRecordId,
+  inspection,
+  action,
+  onSubmit,
+  onCancel,
+}: {
+  renewalRecordId?: string;
+  inspection?: FirearmInspection;
+  action: (formData: FormData) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <form
+      action={action}
+      onSubmit={onSubmit}
+      className="grid gap-3 border-t border-slate-200 pt-4"
+    >
+      {inspection ? (
+        <input type="hidden" name="id" value={inspection.id} />
+      ) : (
+        <input type="hidden" name="renewalRecordId" value={renewalRecordId} />
+      )}
+      <div className={formGrid2}>
+        <label className={formFieldLabel}>
+          <span className={formLabelText}>銃検予定日</span>
+          <DateInput
+            name="scheduledOn"
+            defaultValue={inspection?.scheduledOn ?? ""}
+            exampleText={firearmInspectionDateInputHelp}
+            placeholderText="例: 20260101"
+            className={formFieldCompact}
+          />
+        </label>
+        <label className={formFieldLabel + " lg:col-span-2"}>
+          <span className={formLabelText}>メモ</span>
+          <textarea
+            name="notes"
+            rows={2}
+            defaultValue={inspection?.notes ?? ""}
+            className={formTextareaCompact}
+          />
+        </label>
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <button className="positive-cta min-h-11 rounded-full bg-[#2e7d32] px-5 text-sm font-extrabold !text-white transition-colors hover:bg-[#256528]">
+          銃検予定を保存
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="min-h-11 rounded-full border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700"
+        >
+          キャンセル
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function CompletedInspectionCard({
+  inspection,
+  editing,
+  action,
+  reopenAction,
+  onUpdateSubmit,
+  onReopenSubmit,
+  onEdit,
+  onCancel,
+}: {
+  inspection: FirearmInspection;
+  editing: boolean;
+  action: (formData: FormData) => void;
+  reopenAction: (formData: FormData) => void;
+  onUpdateSubmit: () => void;
+  onReopenSubmit: () => void;
+  onEdit: () => void;
+  onCancel: () => void;
+}) {
+  if (editing) {
+    return (
+      <form
+        action={action}
+        onSubmit={onUpdateSubmit}
+        className="grid gap-3 border-t border-slate-200 pt-4"
+      >
+        <input type="hidden" name="id" value={inspection.id} />
+        <div className={formGrid2}>
+          <label className={formFieldLabel}>
+            <span className={formLabelText}>銃検予定日</span>
+            <DateInput
+              name="scheduledOn"
+              defaultValue={inspection.scheduledOn}
+              exampleText={firearmInspectionDateInputHelp}
+              placeholderText="例: 20260101"
+              className={formFieldCompact}
+            />
+          </label>
+          <label className={formFieldLabel}>
+            <span className={formLabelText}>銃検実施日</span>
+            <DateInput
+              name="inspectedOn"
+              defaultValue={inspection.inspectedOn ?? ""}
+              exampleText={firearmInspectionDateInputHelp}
+              placeholderText="例: 20260101"
+              className={formFieldCompact}
+            />
+          </label>
+          <label className={formFieldLabel + " lg:col-span-2"}>
+            <span className={formLabelText}>メモ</span>
+            <textarea
+              name="notes"
+              rows={2}
+              defaultValue={inspection.notes ?? ""}
+              className={formTextareaCompact}
+            />
+          </label>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button className="positive-cta min-h-11 rounded-full bg-[#2e7d32] px-5 text-sm font-extrabold !text-white transition-colors hover:bg-[#256528]">
+            銃検記録を更新
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="min-h-11 rounded-full border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700"
+          >
+            キャンセル
+          </button>
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <div className={inlinePanelClass}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-slate-950">銃検済み</p>
+          <p className="mt-1 text-sm text-slate-700">
+            予定日：{displayDateWithEra(inspection.scheduledOn)}
+          </p>
+          <p className="mt-1 text-sm text-slate-700">
+            実施日：{displayDateWithEra(inspection.inspectedOn)}
+          </p>
+          <p className="mt-1 text-sm text-slate-700">
+            メモ：{display(inspection.notes)}
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 sm:items-end">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
+          >
+            修正する
+          </button>
+          <form
+            action={reopenAction}
+            onSubmit={(event) => {
+              if (
+                !confirm(
+                  "銃検済みの状態を取り消し、未実施へ戻します。よろしいですか？",
+                )
+              ) {
+                event.preventDefault();
+                return;
+              }
+              onReopenSubmit();
+            }}
+          >
+            <input type="hidden" name="id" value={inspection.id} />
+            <button className="rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900">
+              未実施に戻す
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }
@@ -520,7 +1216,7 @@ function FirearmView({
   ];
 
   return (
-    <div className="rounded-[22px] border border-emerald-950/10 bg-white p-4">
+    <div>
       <h4 className="text-base font-semibold text-slate-950">{display(firearm.manufacturer)} {display(firearm.modelName)}</h4>
       <p className="mt-1 text-sm text-slate-600">{firearm.firearmTypeLabel} / 銃番号 {firearm.serialNumber}</p>
       <FieldGrid items={items} />
@@ -531,7 +1227,7 @@ function FirearmView({
 function FirearmForm({ firearm, onCancel, state, action }: { firearm: Firearm; onCancel: () => void; state: any; action: any }) {
   return (
     <>
-      <form action={action} className="grid gap-3 rounded-[22px] border border-emerald-950/10 bg-white p-4">
+      <form action={action} className="grid gap-3 border-t border-slate-200 pt-4">
         {state && !state.success && state.errors && (
           <div className="rounded-[18px] border border-red-200 bg-red-50 p-3">
             <p className="text-sm font-semibold text-red-800">入力エラーがあります</p>
@@ -544,7 +1240,7 @@ function FirearmForm({ firearm, onCancel, state, action }: { firearm: Firearm; o
         )}
         <input type="hidden" name="id" value={firearm.id} />
         <Note />
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+        <div className={formGrid4}>
         {[
           ["銃の管理名", "firearmDisplayName", firearm.displayName],
           ["メーカー", "manufacturer", firearm.manufacturer],
@@ -630,7 +1326,7 @@ function BarrelCard({
 
   if (editing) {
     return (
-      <form action={action} className="grid gap-3 rounded-[18px] border border-emerald-950/10 bg-white p-3">
+      <form action={action} className="grid gap-3 border-t border-slate-200 pt-4">
         {state && !state.success && state.errors && (
           <div className="rounded-[18px] border border-red-200 bg-red-50 p-3">
             <p className="text-sm font-semibold text-red-800">入力エラーがあります</p>
@@ -643,7 +1339,7 @@ function BarrelCard({
         )}
         <input type="hidden" name="id" value={barrel.id} />
         <Note />
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+        <div className={formGrid4}>
           <label className={formFieldLabel}><span className={formLabelText}>銃身種別</span><select name="barrelType" defaultValue={barrel.barrelType} className={formFieldCompact}><option value="RIFLED">ライフル銃身</option><option value="HALF_RIFLED">ハーフライフル銃身</option><option value="SMOOTHBORE">平筒</option><option value="OTHER">その他</option></select></label>
           {[
             ["種類", "barrelFirearmKind", barrel.firearmKind],
@@ -661,7 +1357,7 @@ function BarrelCard({
     );
   }
   return (
-    <div className={`rounded-[18px] border p-3 ${isPrimary ? "border-emerald-300 bg-emerald-50/80" : "border-emerald-950/10 bg-white"}`}>
+    <div className={`${inlinePanelClass} ${isPrimary ? "border-emerald-300" : ""}`}>
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -719,11 +1415,11 @@ function NewBarrelForm({
   return (
     <form
       action={createFirearmBarrelRecordAction}
-      className="grid gap-3 rounded-[18px] border border-emerald-950/10 bg-white p-3"
+      className="grid gap-3 border-t border-slate-200 pt-4"
     >
       <input type="hidden" name="firearmRecordId" value={firearmId} />
       <Note />
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+      <div className={formGrid4}>
         <label className={formFieldLabel}>
           <span className={formLabelText}>銃身種別</span>
           <select

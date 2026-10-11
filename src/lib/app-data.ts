@@ -20,6 +20,10 @@ import {
 } from "@prisma/client";
 import { DEFAULT_RENEWAL_RULE_CONFIG, resolveRenewalRule, type RenewalRuleConfig } from "@/lib/validation-rules";
 import { withPrismaRetry } from "@/lib/prisma";
+import {
+  firearmBarrelTypeLabels,
+  firearmTypeLabels,
+} from "@/lib/labels";
 
 const DEMO_EMAIL = "demo@local.hunting-app";
 const DEMO_PASSWORD_HASH = "local-demo-password-not-used";
@@ -114,7 +118,7 @@ export async function getDemoUserBundle() {
 export function getDashboardSummaryFallback() {
   return {
     renewals: 0,
-    ammoBalance: 0,
+    ammoRegisteredCount: 0,
     pendingReports: 0,
   };
 }
@@ -132,7 +136,7 @@ export function getRenewalPageDataFallback() {
 export function getAmmoPageDataFallback() {
   return {
     ammoRecords: [],
-    balance: 0,
+    registeredCount: 0,
   };
 }
 
@@ -140,8 +144,27 @@ export function getReportPageDataFallback() {
   return {
     huntingEvents: [],
     municipalitySuggestionsByPrefecture: {},
+    firearmToolOptions: [],
+    ammoBalance: {
+      shotShell: 0,
+      slug: 0,
+      airgunPellet: 0,
+    },
   };
 }
+
+export type AmmoUsageCategory = "shotShell" | "slug" | "airgunPellet";
+
+export type FirearmToolOption = {
+  value: string;
+  firearmRecordId: string;
+  firearmBarrelRecordId: string | null;
+  label: string;
+  detailLabel: string;
+  caliberLabel: string;
+  ammoUsageCategory: AmmoUsageCategory;
+  ammoUsageLabel: string;
+};
 
 export function getAccountPageDataFallback() {
   return {
@@ -164,9 +187,7 @@ export function getAccountPageDataFallback() {
 }
 
 export function getDataLoadErrorMessage(error: unknown) {
-  if (error instanceof Error && error.message) {
-    return `データの取得に失敗しました。接続を確認して再読み込みしてください。(${error.message})`;
-  }
+  console.error("Failed to load application data", error);
 
   return "データの取得に失敗しました。接続を確認して再読み込みしてください。";
 }
@@ -188,6 +209,9 @@ export async function getDashboardSummary() {
       where: {
         userId: user.id,
         deletedAt: null,
+        recordType: {
+          not: AmmoRecordType.CONSUME,
+        },
       },
       select: {
         recordType: true,
@@ -208,17 +232,14 @@ export async function getDashboardSummary() {
     }),
   );
 
-  const ammoBalance = ammoRecords.reduce((total, record) => {
-    if (record.recordType === AmmoRecordType.CONSUME) {
-      return total - record.quantity;
-    }
-
-    return total + record.quantity;
-  }, 0);
+  const ammoRegisteredCount = ammoRecords.reduce(
+    (total, record) => total + record.quantity,
+    0,
+  );
 
   return {
     renewals,
-    ammoBalance,
+    ammoRegisteredCount,
     pendingReports,
   };
 }
@@ -270,6 +291,12 @@ export async function getRenewalPageData() {
             },
             orderBy: { createdAt: "asc" },
           },
+          firearmInspectionRecords: {
+            where: {
+              deletedAt: null,
+            },
+            orderBy: [{ scheduledOn: "desc" }, { createdAt: "desc" }],
+          },
         },
         orderBy: [{ expiresOn: "asc" }, { createdAt: "desc" }],
       }),
@@ -287,26 +314,26 @@ export async function getAmmoPageData() {
       where: {
         userId: user.id,
         deletedAt: null,
+        recordType: {
+          not: AmmoRecordType.CONSUME,
+        },
       },
       orderBy: [{ transactionDate: "desc" }, { createdAt: "desc" }],
     }),
   );
 
-  const balance = ammoRecords.reduce((total, record) => {
-    if (record.recordType === AmmoRecordType.CONSUME) {
-      return total - record.quantity;
-    }
+  const registeredCount = ammoRecords.reduce(
+    (total, record) => total + record.quantity,
+    0,
+  );
 
-    return total + record.quantity;
-  }, 0);
-
-  return { user, ammoRecords, balance };
+  return { user, ammoRecords, registeredCount };
 }
 
 export async function getReportPageData() {
   const user = await getCurrentUser();
 
-  const [huntingEvents, municipalitySuggestionRows] = await withPrismaRetry(
+  const [huntingEvents, municipalitySuggestionRows, ammoRecords, usageRows, firearmRecords] = await withPrismaRetry(
     (prisma) =>
       Promise.all([
         prisma.huntingEvent.findMany({
@@ -328,6 +355,9 @@ export async function getReportPageData() {
             shootingType: true,
             shootingRangeName: true,
             shotCount: true,
+            shotShellUsedCount: true,
+            slugUsedCount: true,
+            airgunPelletUsedCount: true,
             isReportTransferTarget: true,
             notes: true,
             importedToReportAt: true,
@@ -337,6 +367,8 @@ export async function getReportPageData() {
               },
               select: {
                 id: true,
+                firearmRecordId: true,
+                firearmBarrelRecordId: true,
                 toolType: true,
                 toolName: true,
                 quantity: true,
@@ -372,6 +404,64 @@ export async function getReportPageData() {
           distinct: ["prefectureCode", "areaName"],
           orderBy: [{ prefectureCode: "asc" }, { areaName: "asc" }],
         }),
+        prisma.ammoRecord.findMany({
+          where: {
+            userId: user.id,
+            deletedAt: null,
+            recordType: {
+              not: AmmoRecordType.CONSUME,
+            },
+          },
+          select: {
+            recordType: true,
+            ammoCategory: true,
+            quantity: true,
+          },
+        }),
+        prisma.huntingEvent.findMany({
+          where: {
+            userId: user.id,
+            deletedAt: null,
+          },
+          select: {
+            shotShellUsedCount: true,
+            slugUsedCount: true,
+            airgunPelletUsedCount: true,
+          },
+        }),
+        prisma.firearmRecord.findMany({
+          where: {
+            deletedAt: null,
+            renewalRecord: {
+              userId: user.id,
+              deletedAt: null,
+            },
+          },
+          select: {
+            id: true,
+            displayName: true,
+            firearmType: true,
+            manufacturer: true,
+            modelName: true,
+            caliber: true,
+            features: true,
+            barrelRecords: {
+              where: {
+                deletedAt: null,
+              },
+              select: {
+                id: true,
+                barrelType: true,
+                caliber: true,
+                features: true,
+                purposeMemo: true,
+                isPrimary: true,
+              },
+              orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+            },
+          },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        }),
       ]),
   );
 
@@ -389,7 +479,184 @@ export async function getReportPageData() {
       return result;
     }, {});
 
-  return { user, huntingEvents, municipalitySuggestionsByPrefecture };
+  const ammoBalance = calculateAmmoBalance(ammoRecords, usageRows);
+  const firearmToolOptions = buildFirearmToolOptions(firearmRecords);
+
+  return {
+    user,
+    huntingEvents,
+    municipalitySuggestionsByPrefecture,
+    firearmToolOptions,
+    ammoBalance,
+  };
+}
+
+type FirearmToolSource = {
+  id: string;
+  displayName: string;
+  firearmType: FirearmType;
+  manufacturer: string | null;
+  modelName: string | null;
+  caliber: string | null;
+  features: string | null;
+  barrelRecords: Array<{
+    id: string;
+    barrelType: FirearmBarrelType;
+    caliber: string | null;
+    features: string | null;
+    purposeMemo: string | null;
+    isPrimary: boolean;
+  }>;
+};
+
+function getFirearmBaseName(firearm: FirearmToolSource) {
+  const parts = [
+    firearm.displayName,
+    firearm.manufacturer,
+    firearm.modelName,
+  ].filter((part) => part && part.trim().length > 0);
+
+  return parts.length > 0 ? parts.join(" ") : firearmTypeLabels[firearm.firearmType];
+}
+
+function getBarrelDisplayName(index: number, barrel: FirearmToolSource["barrelRecords"][number]) {
+  return `${index === 0 ? "銃身情報" : `替え銃身 ${index}`} / ${firearmBarrelTypeLabels[barrel.barrelType]}`;
+}
+
+function formatReportCaliber(value: string | null | undefined) {
+  if (!value) {
+    return "口径未登録";
+  }
+
+  return value.endsWith("番") || value.endsWith("mm") ? value : `${value}番`;
+}
+
+function getAmmoUsageCategoryForFirearm(
+  firearm: Pick<FirearmToolSource, "firearmType">,
+  barrel?: Pick<FirearmToolSource["barrelRecords"][number], "barrelType" | "features" | "purposeMemo">,
+): AmmoUsageCategory {
+  if (firearm.firearmType === FirearmType.AIR_RIFLE) {
+    return "airgunPellet";
+  }
+
+  if (
+    firearm.firearmType === FirearmType.RIFLE ||
+    barrel?.barrelType === FirearmBarrelType.RIFLED ||
+    barrel?.barrelType === FirearmBarrelType.HALF_RIFLED ||
+    [barrel?.features, barrel?.purposeMemo].some((value) =>
+      value?.includes("スラッグ") || value?.includes("ライフル"),
+    )
+  ) {
+    return "slug";
+  }
+
+  return "shotShell";
+}
+
+function getAmmoUsageLabel(category: AmmoUsageCategory) {
+  if (category === "slug") {
+    return "単弾";
+  }
+  if (category === "airgunPellet") {
+    return "空気銃弾";
+  }
+  return "散弾";
+}
+
+function buildFirearmToolOptions(
+  firearmRecords: FirearmToolSource[],
+): FirearmToolOption[] {
+  return firearmRecords.flatMap((firearm) => {
+    const firearmName = getFirearmBaseName(firearm);
+    const firearmCategory = getAmmoUsageCategoryForFirearm(firearm);
+    const firearmOption: FirearmToolOption = {
+      value: `firearm:${firearm.id}`,
+      firearmRecordId: firearm.id,
+      firearmBarrelRecordId: null,
+      label: `${firearmName} / 銃本体 / ${formatReportCaliber(firearm.caliber)}`,
+      detailLabel: [firearm.features].filter(Boolean).join(" / "),
+      caliberLabel: formatReportCaliber(firearm.caliber),
+      ammoUsageCategory: firearmCategory,
+      ammoUsageLabel: getAmmoUsageLabel(firearmCategory),
+    };
+
+    const barrelOptions = firearm.barrelRecords.map((barrel, index) => {
+      const barrelCategory = getAmmoUsageCategoryForFirearm(firearm, barrel);
+      const detailLabel = [barrel.features, barrel.purposeMemo]
+        .filter((value) => value && value.trim().length > 0)
+        .join(" / ");
+
+      return {
+        value: `barrel:${firearm.id}:${barrel.id}`,
+        firearmRecordId: firearm.id,
+        firearmBarrelRecordId: barrel.id,
+        label: `${firearmName} / ${getBarrelDisplayName(index, barrel)} / ${formatReportCaliber(barrel.caliber ?? firearm.caliber)}`,
+        detailLabel,
+        caliberLabel: formatReportCaliber(barrel.caliber ?? firearm.caliber),
+        ammoUsageCategory: barrelCategory,
+        ammoUsageLabel: getAmmoUsageLabel(barrelCategory),
+      } satisfies FirearmToolOption;
+    });
+
+    return [firearmOption, ...barrelOptions];
+  });
+}
+
+type AmmoBalanceSourceRecord = {
+  recordType: AmmoRecordType;
+  ammoCategory: AmmoCategory;
+  quantity: number;
+};
+
+type AmmoUsageSourceRecord = {
+  shotShellUsedCount: number | null;
+  slugUsedCount: number | null;
+  airgunPelletUsedCount: number | null;
+};
+
+function getAmmoQuantitySign(recordType: AmmoRecordType) {
+  if (
+    recordType === "TRANSFER_OUT" ||
+    recordType === "DISPOSAL"
+  ) {
+    return -1;
+  }
+
+  return 1;
+}
+
+function calculateAmmoBalance(
+  ammoRecords: AmmoBalanceSourceRecord[],
+  usageRows: AmmoUsageSourceRecord[],
+) {
+  const balance = {
+    shotShell: 0,
+    slug: 0,
+    airgunPellet: 0,
+  };
+
+  for (const record of ammoRecords) {
+    const quantity = record.quantity * getAmmoQuantitySign(record.recordType);
+
+    if (record.ammoCategory === AmmoCategory.SHOT_SHELL) {
+      balance.shotShell += quantity;
+    } else if (
+      record.ammoCategory === AmmoCategory.SLUG ||
+      record.ammoCategory === AmmoCategory.RIFLE_ROUND
+    ) {
+      balance.slug += quantity;
+    } else if (record.ammoCategory === AmmoCategory.AIR_PELLET) {
+      balance.airgunPellet += quantity;
+    }
+  }
+
+  for (const usage of usageRows) {
+    balance.shotShell -= usage.shotShellUsedCount ?? 0;
+    balance.slug -= usage.slugUsedCount ?? 0;
+    balance.airgunPellet -= usage.airgunPelletUsedCount ?? 0;
+  }
+
+  return balance;
 }
 
 export type AccountPageData = User & {
@@ -439,11 +706,12 @@ export const renewalStatusOptions = [
 ];
 
 export const ammoRecordTypeOptions = [
-  AmmoRecordType.PURCHASE,
-  AmmoRecordType.CONSUME,
-  AmmoRecordType.ADJUST,
-  AmmoRecordType.CARRYOVER,
-];
+  "PURCHASE",
+  "TRANSFER_IN",
+  "TRANSFER_OUT",
+  "DISPOSAL",
+  "ADJUST",
+] satisfies AmmoRecordType[];
 
 export const ammoCategoryOptions = [
   AmmoCategory.SHOT_SHELL,

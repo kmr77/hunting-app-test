@@ -3,7 +3,7 @@ import {
   uploadRenewalPermitImageAction,
 } from "@/app/actions";
 import { FeedbackBanner } from "@/components/feedback-banner";
-import { RenewalCreateForm } from "@/components/renewals/renewal-create-form";
+import { RenewalCreateShortcuts } from "@/components/renewals/renewal-create-shortcuts";
 import { RenewalDeleteForm } from "@/components/renewals/renewal-delete-form";
 import { PermitImageUploader } from "@/components/renewals/permit-image-uploader";
 import { RenewalRecordCard } from "@/components/renewals/renewal-record-card";
@@ -24,6 +24,7 @@ import { formatDateInput, formatDateLabel, formatJapaneseEraDate } from "@/lib/f
 import {
   firearmStatusLabels,
   firearmBarrelTypeLabels,
+  firearmInspectionStatusLabels,
   firearmTypeLabels,
   renewalCategoryLabels,
   renewalStatusLabels,
@@ -105,7 +106,7 @@ export default async function RenewalsPage({
       </section>
 
       <section className="grid gap-4">
-        <RenewalCreateForm
+        <RenewalCreateShortcuts
           renewalRuleConfigs={renewalRuleConfigs}
           userBirthDate={userBirthDate}
         />
@@ -122,6 +123,24 @@ export default async function RenewalsPage({
               );
               const canAttachPermitImage =
                 renewal.category === RenewalCategory.GUN_LICENSE;
+              const isGunLicense =
+                renewal.category === RenewalCategory.GUN_LICENSE;
+              const unavailableLabel = "未登録";
+              const issuedOnLabel = renewal.issuedOn
+                ? formatJapaneseEraDate(renewal.issuedOn)
+                : unavailableLabel;
+              const permittedOnLabel = renewal.originalPermittedOn
+                ? formatJapaneseEraDate(renewal.originalPermittedOn)
+                : unavailableLabel;
+              const expiresOnLabel = renewal.expiresOn
+                ? formatJapaneseEraDate(renewal.expiresOn)
+                : unavailableLabel;
+              const permitNumberLabel = renewal.permitNumber
+                ? `第${renewal.permitNumber}号`
+                : unavailableLabel;
+              const permitImageCount = renewal.fileRecords.filter(
+                (file) => file.fileCategory === FileCategory.LICENSE_COPY,
+              ).length;
               const renewalCardData = {
                 id: renewal.id,
                 category: renewal.category,
@@ -177,98 +196,139 @@ export default async function RenewalsPage({
                     isPrimary: barrel.isPrimary,
                   })),
                 })),
+                firearmInspectionRecords:
+                  renewal.firearmInspectionRecords.map((inspection) => ({
+                    id: inspection.id,
+                    scheduledOn: formatDateInput(inspection.scheduledOn),
+                    status: inspection.status,
+                    statusLabel:
+                      firearmInspectionStatusLabels[inspection.status],
+                    inspectedOn: formatDateInput(inspection.inspectedOn),
+                    notes: inspection.notes,
+                    completedAt: formatDateInput(inspection.completedAt),
+                  })),
               };
 
               return (
-                <article
-                  key={renewal.id}
-                  className="rounded-[30px] border border-emerald-950/10 bg-white/92 p-5 shadow-[0_24px_50px_-36px_rgba(15,23,42,0.38)]"
-                >
-                  <div className="grid gap-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="space-y-1">
-                        <p className="text-xs font-semibold tracking-[0.16em] text-slate-500 uppercase">
-                          {renewalCategoryLabels[renewal.category]}
-                        </p>
-                        <h3 className="text-lg font-semibold text-slate-950">
-                          {renewal.title}
-                        </h3>
-                        <p className="text-sm text-slate-600">
-                          有効期限日 {formatJapaneseEraDate(renewal.expiresOn)}
-                        </p>
-                      </div>
-                      <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-900">
-                        {renewalStatusLabels[renewal.status]}
-                      </span>
-                    </div>
-
+                <div key={renewal.id}>
                     <RenewalRecordCard
                       renewal={renewalCardData}
                       userBirthDate={userBirthDate}
-                    />
-                  </div>
+                    >
+                      {canAttachPermitImage ? (
+                        <section>
+                          <div className="mb-3">
+                            <p className="text-sm font-semibold text-slate-900">
+                              許可証画像
+                            </p>
+                            <p className="text-xs leading-6 text-slate-600">
+                              銃砲所持許可は1枚まで登録できます。選択した画像は保存前にWebPへ軽量化します。
+                            </p>
+                          </div>
 
-                {canAttachPermitImage ? (
-                  <section className="mt-4 rounded-[24px] bg-emerald-50/70 p-4">
-                    <div className="mb-3">
-                      <p className="text-sm font-semibold text-slate-900">
-                        許可証画像
-                      </p>
-                      <p className="text-xs leading-6 text-slate-600">
-                        銃砲所持許可は1枚まで登録できます。選択した画像は保存前にWebPへ軽量化します。
-                      </p>
-                    </div>
+                          {permitImage ? (
+                            <div className="mb-4 grid gap-3">
+                              <a
+                                href={permitImage.storageKey}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="block overflow-hidden rounded-[18px] border border-slate-200 bg-white"
+                              >
+                                <img
+                                  src={permitImage.storageKey}
+                                  alt={`${renewal.title}の許可証画像`}
+                                  className="max-h-80 w-full object-contain"
+                                />
+                              </a>
+                              <div className="flex flex-col gap-2 text-xs leading-6 text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+                                <span>
+                                  {permitImage.originalFileName} /{" "}
+                                  {Math.ceil(permitImage.fileSize / 1024)}KB
+                                </span>
+                                <form action={deleteRenewalPermitImageAction}>
+                                  <input
+                                    type="hidden"
+                                    name="renewalRecordId"
+                                    value={renewal.id}
+                                  />
+                                  <input
+                                    type="hidden"
+                                    name="fileRecordId"
+                                    value={permitImage.id}
+                                  />
+                                  <SubmitButton
+                                    variant="danger"
+                                    pendingChildren="削除中..."
+                                  >
+                                    画像を削除
+                                  </SubmitButton>
+                                </form>
+                              </div>
+                            </div>
+                          ) : null}
 
-                    {permitImage ? (
-                      <div className="mb-4 grid gap-3">
-                        <a
-                          href={permitImage.storageKey}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="block overflow-hidden rounded-[22px] border border-emerald-950/10 bg-white"
-                        >
-                          <img
-                            src={permitImage.storageKey}
-                            alt={`${renewal.title}の許可証画像`}
-                            className="max-h-80 w-full object-contain"
+                          <PermitImageUploader
+                            action={uploadRenewalPermitImageAction}
+                            renewalRecordId={renewal.id}
                           />
-                        </a>
-                        <div className="flex flex-col gap-2 text-xs leading-6 text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-                          <span>
-                            {permitImage.originalFileName} /{" "}
-                            {Math.ceil(permitImage.fileSize / 1024)}KB
-                          </span>
-                          <form action={deleteRenewalPermitImageAction}>
-                            <input
-                              type="hidden"
-                              name="renewalRecordId"
-                              value={renewal.id}
-                            />
-                            <input
-                              type="hidden"
-                              name="fileRecordId"
-                              value={permitImage.id}
-                            />
-                            <SubmitButton
-                              variant="danger"
-                              pendingChildren="削除中..."
-                            >
-                              画像を削除
-                            </SubmitButton>
-                          </form>
-                        </div>
+                        </section>
+                      ) : null}
+
+                      <div className={canAttachPermitImage ? "mt-6 border-t border-slate-200 pt-6" : ""}>
+                        <RenewalDeleteForm
+                          renewalId={renewal.id}
+                          triggerLabel={
+                            isGunLicense
+                              ? "この銃砲所持許可情報を削除"
+                              : "この狩猟免許情報を削除"
+                          }
+                          modalTitle={
+                            isGunLicense
+                              ? "この銃砲所持許可情報を削除しますか？"
+                              : "この狩猟免許情報を削除しますか？"
+                          }
+                          title={renewal.title}
+                          categoryLabel={renewalCategoryLabels[renewal.category]}
+                          issuedOnLabel={isGunLicense ? null : issuedOnLabel}
+                          permittedOnLabel={isGunLicense ? permittedOnLabel : null}
+                          expiresOnLabel={expiresOnLabel}
+                          permitNumberLabel={isGunLicense ? permitNumberLabel : null}
+                          warningText={
+                            isGunLicense
+                              ? "削除すると、この銃砲所持許可に紐づく銃本体・銃身情報・銃検履歴なども利用できなくなります。"
+                              : "削除すると、この狩猟免許の更新情報を確認できなくなります。"
+                          }
+                          relatedItemsTitle={
+                            isGunLicense
+                              ? "この銃砲所持許可には以下が紐づいています。"
+                              : null
+                          }
+                          imageCount={isGunLicense ? permitImageCount : 0}
+                          firearmCount={renewal.firearmRecords.length}
+                          barrelCount={renewal.firearmRecords.reduce(
+                            (total, firearm) => total + firearm.barrelRecords.length,
+                            0,
+                          )}
+                          inspectionCount={renewal.firearmInspectionRecords.length}
+                          confirmLabel={
+                            isGunLicense
+                              ? "銃砲所持許可情報を削除"
+                              : "狩猟免許情報を削除"
+                          }
+                          successMessage={
+                            isGunLicense
+                              ? "銃砲所持許可情報を削除しました。"
+                              : "狩猟免許情報を削除しました。"
+                          }
+                          errorMessage={
+                            isGunLicense
+                              ? "銃砲所持許可情報の削除に失敗しました。もう一度お試しください。"
+                              : "狩猟免許情報の削除に失敗しました。もう一度お試しください。"
+                          }
+                        />
                       </div>
-                    ) : null}
-
-                    <PermitImageUploader
-                      action={uploadRenewalPermitImageAction}
-                      renewalRecordId={renewal.id}
-                    />
-                  </section>
-                ) : null}
-
-                <RenewalDeleteForm renewalId={renewal.id} />
-              </article>
+                    </RenewalRecordCard>
+                </div>
               );
             })
           )}

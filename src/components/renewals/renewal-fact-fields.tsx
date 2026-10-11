@@ -2,7 +2,12 @@
 
 import { DateInput } from "@/components/date-input";
 import { FieldError } from "@/components/field-error";
-import { formFieldBase, formFieldLabel, formLabelText, formHelperText } from "@/lib/form-classes";
+import {
+  formFieldBase,
+  formFieldLabel,
+  formHelperText,
+  formLabelText,
+} from "@/lib/form-classes";
 import {
   calculateGunLicenseExpiresOn,
   calculateHuntingLicenseExpiresOn,
@@ -17,6 +22,7 @@ type RenewalCategoryValue = "HUNTING_LICENSE" | "GUN_LICENSE";
 type RenewalFactFieldsProps = {
   defaultCategory?: string;
   defaultIssuedOn?: string;
+  onCategoryChange?: (category: RenewalCategoryValue) => void;
   userBirthDate?: string;
   errors?: Record<string, string>;
   renewalRuleConfigs: Record<RenewalCategoryValue, RenewalRuleConfig>;
@@ -108,6 +114,7 @@ function getEmptyNextAction(category: RenewalCategoryValue) {
 export function RenewalFactFields({
   defaultCategory = "HUNTING_LICENSE",
   defaultIssuedOn = "",
+  onCategoryChange,
   userBirthDate = "",
   renewalRuleConfigs,
   errors = {},
@@ -176,6 +183,7 @@ export function RenewalFactFields({
 
   function handleCategoryChange(value: RenewalCategoryValue) {
     setCategory(value);
+    onCategoryChange?.(value);
   }
 
   function handleOriginalPermittedOnChange(value: string) {
@@ -183,58 +191,60 @@ export function RenewalFactFields({
   }
 
   return (
-    <>
-      <label className={formFieldLabel}>
-        <span className={formLabelText}>種別</span>
-        <select
-          name="category"
-          value={category}
-          onChange={(event) =>
-            handleCategoryChange(event.target.value as RenewalCategoryValue)
-          }
-          className={formFieldBase}
-        >
-          {categoryOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      {category === "GUN_LICENSE" ? (
+    <div className="renewal-fact-layout">
+      <div className="renewal-fact-basic-grid">
         <label className={formFieldLabel}>
-          <span className={formLabelText}>許可日</span>
-          <DateInput
-            name="originalPermittedOn"
-            value={originalPermittedOn}
+          <span className={formLabelText}>種別</span>
+          <select
+            name="category"
+            value={category}
             onChange={(event) =>
-              handleOriginalPermittedOnChange(event.target.value)
+              handleCategoryChange(event.target.value as RenewalCategoryValue)
             }
+            className={formFieldBase}
+          >
+            {categoryOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {category === "GUN_LICENSE" ? (
+          <label className={formFieldLabel}>
+            <span className={formLabelText}>許可日</span>
+            <DateInput
+              name="originalPermittedOn"
+              value={originalPermittedOn}
+              onChange={(event) =>
+                handleOriginalPermittedOnChange(event.target.value)
+              }
+              className={formFieldBase}
+            />
+            <span className={formHelperText}>
+              銃砲所持許可証に記載されている許可日を入力します。有効期限日はこの日付を基準に自動計算します。
+            </span>
+            <FieldError error={errors.originalPermittedOn} />
+          </label>
+        ) : null}
+
+        <label className={formFieldLabel}>
+          <span className={formLabelText}>交付日</span>
+          <DateInput
+            name="issuedOn"
+            value={issuedOn}
+            onChange={(event) => setIssuedOn(event.target.value)}
             className={formFieldBase}
           />
           <span className={formHelperText}>
-            銃砲所持許可証に記載されている許可日を入力します。有効期限日はこの日付を基準に自動計算します。
+            免状・許可証に記載されている交付日を入力します。
           </span>
-          <FieldError error={errors.originalPermittedOn} />
+          <FieldError error={errors.issuedOn} />
         </label>
-      ) : null}
+      </div>
 
-      <label className={formFieldLabel}>
-        <span className={formLabelText}>交付日</span>
-        <DateInput
-          name="issuedOn"
-          value={issuedOn}
-          onChange={(event) => setIssuedOn(event.target.value)}
-          className={formFieldBase}
-        />
-        <span className={formHelperText}>
-          免状・許可証に記載されている交付日を入力します。
-        </span>
-        <FieldError error={errors.issuedOn} />
-      </label>
-
-      <div className="min-w-0 space-y-1.5 rounded-[20px] border border-emerald-950/10 bg-emerald-50/70 p-4 text-sm">
+      <div className="renewal-fact-expiry-card space-y-1.5 rounded-[20px] border border-emerald-950/10 bg-emerald-50/70 p-4 text-sm">
         <span className={formLabelText}>有効期限日</span>
         <p className="font-semibold text-slate-950">
           {category === "GUN_LICENSE"
@@ -253,14 +263,14 @@ export function RenewalFactFields({
         <FieldError error={errors.expiresOn} />
       </div>
 
-      <section className="lg:col-span-4 rounded-[24px] border border-emerald-950/10 bg-emerald-50/70 p-4">
+      <section className="renewal-fact-auto-section rounded-[24px] border border-emerald-950/10 bg-emerald-50/70 p-4">
         <div className="mb-3">
           <p className="text-sm font-semibold text-slate-900">自動計算</p>
           <p className="text-xs leading-6 text-slate-600">
             入力された事実をもとに、更新予定・通知開始・次にやることをアプリが自動表示します。
           </p>
         </div>
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+        <div className="renewal-fact-auto-grid">
           {autoItems.map((item) => (
             <div
               key={item.label}
@@ -273,7 +283,7 @@ export function RenewalFactFields({
               <p className="mt-1 text-xs leading-5 text-slate-500">{item.help}</p>
             </div>
           ))}
-          <div className="min-w-0 rounded-[18px] border border-emerald-950/10 bg-white px-4 py-3 lg:col-span-4">
+          <div className="renewal-fact-next-action min-w-0 rounded-[18px] border border-emerald-950/10 bg-white px-4 py-3">
             <p className="text-xs font-semibold text-slate-500">次にやること</p>
             <p className="mt-1 text-sm font-semibold leading-6 text-slate-950">
             {targetDate
@@ -286,7 +296,7 @@ export function RenewalFactFields({
 
       {category === "GUN_LICENSE" ? (
         <>
-          <p className="lg:col-span-4 text-sm font-bold text-red-600">
+          <p className="renewal-fact-warning text-sm font-bold text-red-600">
             銃砲許可証に記載されている情報をそのまま記載してください
           </p>
           {typeof gunPermitFields === "function"
@@ -298,6 +308,6 @@ export function RenewalFactFields({
           {gunFields}
         </>
       ) : null}
-    </>
+    </div>
   );
 }

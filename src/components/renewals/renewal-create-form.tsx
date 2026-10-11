@@ -17,6 +17,7 @@ import {
   formTextareaBase,
   formTextareaCompact,
   formFieldLabel,
+  formGrid4,
   formLabelText,
   formSectionCard,
 } from "@/lib/form-classes";
@@ -33,12 +34,22 @@ const firearmStatusOptions = ["ACTIVE", "DISPOSED", "INACTIVE"] as const;
 export function RenewalCreateForm({
   renewalRuleConfigs,
   userBirthDate,
+  defaultCategory = "HUNTING_LICENSE",
+  onSaved,
+  onDirtyChange,
+  onCategoryChange,
+  className,
 }: {
   renewalRuleConfigs: Record<
     "HUNTING_LICENSE" | "GUN_LICENSE",
     RenewalRuleConfig
   >;
   userBirthDate: string;
+  defaultCategory?: "HUNTING_LICENSE" | "GUN_LICENSE";
+  onSaved?: (message: string) => void;
+  onDirtyChange?: (dirty: boolean) => void;
+  onCategoryChange?: (category: "HUNTING_LICENSE" | "GUN_LICENSE") => void;
+  className?: string;
 }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -71,15 +82,25 @@ export function RenewalCreateForm({
         return;
       }
 
-      setSuccessMessage("免許・許可情報を保存しました。");
+      const message = "免許・許可情報を保存しました。";
+      setSuccessMessage(message);
+      onDirtyChange?.(false);
       router.refresh();
+      onSaved?.(message);
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} className={formSectionCard}>
+    <form
+      id="renewal-create-form"
+      ref={formRef}
+      onSubmit={handleSubmit}
+      onInput={() => onDirtyChange?.(true)}
+      onChange={() => onDirtyChange?.(true)}
+      className={`${className ?? formSectionCard} scroll-mt-6`}
+    >
       <div className="mb-4">
         <p className="text-[11px] font-semibold tracking-[0.22em] text-slate-500 uppercase">新規登録</p>
         <h3 className="mt-1 text-lg font-semibold">免許・許可情報を追加</h3>
@@ -103,10 +124,12 @@ export function RenewalCreateForm({
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+      <div className="space-y-4">
         <input type="hidden" name="jurisdictionCode" value="" />
 
         <RenewalFactFields
+          defaultCategory={defaultCategory}
+          onCategoryChange={onCategoryChange}
           renewalRuleConfigs={renewalRuleConfigs}
           userBirthDate={userBirthDate}
           errors={fieldErrors}
@@ -114,7 +137,7 @@ export function RenewalCreateForm({
           gunFields={<GunFields errors={fieldErrors} />}
         />
 
-        <label className={formFieldLabel + " lg:col-span-4"}>
+        <label className={formFieldLabel}>
           <span className={formLabelText}>メモ</span>
           <textarea
             name="notes"
@@ -142,7 +165,7 @@ function GunFields({ errors }: { errors: FieldErrors }) {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+      <div className={formGrid4}>
         <label className={formFieldLabel + " lg:col-span-2"}>
           <span className={formLabelText}>銃の管理名</span>
           <input

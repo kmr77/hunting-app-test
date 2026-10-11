@@ -2,7 +2,12 @@ import { updateAccountAction } from "@/app/actions";
 import { FeedbackBanner } from "@/components/feedback-banner";
 import { FieldError } from "@/components/field-error";
 import { DateInput } from "@/components/date-input";
-import { formFieldBase, formFieldLabel, formLabelText } from "@/lib/form-classes";
+import {
+  formFieldBase,
+  formFieldLabel,
+  formGrid3,
+  formLabelText,
+} from "@/lib/form-classes";
 import { SubmitButton } from "@/components/submit-button";
 import {
   getDataLoadErrorMessage,
@@ -90,7 +95,7 @@ export default async function AccountPage({
             <h3 className="mt-1 text-lg font-semibold">プロフィールを更新</h3>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+          <div className={formGrid3}>
             <label className={formFieldLabel}>
               <span className={formLabelText}>姓</span>
               <input
