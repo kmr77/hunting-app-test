@@ -121,6 +121,7 @@ export function AmmoRecordList({
   feedbackTarget,
 }: AmmoRecordListProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingRecordType, setEditingRecordType] = useState("");
 
   if (records.length === 0) {
     return (
@@ -155,7 +156,7 @@ export function AmmoRecordList({
                     {ammoRecordTypeLabels[record.recordType]}
                   </p>
                   <h3 className="text-lg font-semibold text-slate-950">
-                    {ammoCategoryLabels[record.ammoCategory]} / 購入した弾数 {record.quantity} 発
+                    {ammoCategoryLabels[record.ammoCategory]} / {record.recordType === "PURCHASE" ? "購入した弾数" : record.recordType === "ADJUST" ? "調整増減数" : "記録数量"} {record.recordType === "ADJUST" && record.quantity > 0 ? "+" : ""}{record.quantity} 発
                   </h3>
                   <p className="text-sm text-slate-600">
                     {formatAmmoRecordDateLabel(record.transactionDate)}
@@ -165,7 +166,7 @@ export function AmmoRecordList({
                 {!isEditing ? (
                   <button
                     type="button"
-                    onClick={() => setEditingId(record.id)}
+                    onClick={() => { setEditingRecordType(record.recordType); setEditingId(record.id); }}
                     className="min-h-10 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700"
                   >
                     編集
@@ -191,6 +192,7 @@ export function AmmoRecordList({
                       <select
                         name="recordType"
                         defaultValue={record.recordType}
+                        onChange={(event) => setEditingRecordType(event.target.value)}
                         className={formFieldCompact + " w-full"}
                       >
                         {recordTypeOptions.map((option) => (
@@ -211,12 +213,13 @@ export function AmmoRecordList({
                           <span className={formLabelText}>数量</span>
                           <input
                             type="number"
-                            min={1}
+                            min={(editingRecordType || record.recordType) === "ADJUST" ? undefined : 1}
                             required
                             name="quantity"
                             defaultValue={record.quantity}
                             className={formFieldCompact + " w-full"}
                           />
+                          {(editingRecordType || record.recordType) === "ADJUST" ? <span className="text-xs text-slate-500">増やす場合は正数、減らす場合は負数を入力してください。</span> : null}
                         </label>
                       }
                       manufacturerField={

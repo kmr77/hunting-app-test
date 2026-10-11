@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createAmmoAction, type AmmoActionState } from "@/app/actions";
 import { DateInput } from "@/components/date-input";
@@ -24,7 +24,10 @@ type AmmoCreateFormProps = {
   ammoCategoryOptions: Option[];
 };
 
-const initialState: AmmoActionState = {
+type AmmoFormState = AmmoActionState & { resetKey: number };
+
+const initialState: AmmoFormState = {
+  resetKey: 0,
   success: false,
   values: {
     transactionDate: "",
@@ -72,21 +75,21 @@ export function AmmoCreateForm({
   ammoCategoryOptions,
 }: AmmoCreateFormProps) {
   const router = useRouter();
-  const [state, formAction] = useActionState(createAmmoAction, initialState);
-  const [formKey, setFormKey] = useState(0);
+  const [recordType, setRecordType] = useState(initialState.values.recordType);
+  const [state, formAction] = useActionState(async (previous: AmmoFormState, data: FormData): Promise<AmmoFormState> => {
+    const result = await createAmmoAction(previous, data);
+    if (result.success) {
+      setRecordType(initialState.values.recordType);
+      router.refresh();
+    }
+    return { ...result, resetKey: previous.resetKey + (result.success ? 1 : 0) };
+  }, initialState);
   const values = state.values;
   const fieldErrors = state.fieldErrors ?? {};
 
-  useEffect(() => {
-    if (state.success) {
-      setFormKey((current) => current + 1);
-      router.refresh();
-    }
-  }, [router, state.success, state.message]);
-
   return (
     <form
-      key={formKey}
+      key={state.resetKey}
       id="ammo-new"
       action={formAction}
       noValidate
@@ -117,6 +120,7 @@ export function AmmoCreateForm({
           <select
             name="recordType"
             defaultValue={values.recordType}
+            onChange={(event) => setRecordType(event.target.value)}
             className={formFieldBase}
           >
             {recordTypeOptions.map((option) => (
@@ -125,6 +129,7 @@ export function AmmoCreateForm({
               </option>
             ))}
           </select>
+          <FieldError message={fieldErrors.recordType} />
         </label>
 
         <AmmoCategoryFields
@@ -139,10 +144,11 @@ export function AmmoCreateForm({
               <input
                 type="number"
                 name="quantity"
-                min={1}
+                min={recordType === "ADJUST" ? undefined : 1}
                 defaultValue={values.quantity}
                 className={formFieldBase}
               />
+              {recordType === "ADJUST" ? <span className="text-xs text-slate-500">増やす場合は正数、減らす場合は負数を入力してください。</span> : null}
               <FieldError message={fieldErrors.quantity} />
             </label>
           }

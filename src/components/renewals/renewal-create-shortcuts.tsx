@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { RenewalCreateForm } from "@/components/renewals/renewal-create-form";
 import type { RenewalRuleConfig } from "@/lib/validation-rules";
 
@@ -44,21 +44,20 @@ export function RenewalCreateShortcuts({
     setOpen(true);
   }
 
-  function requestClose() {
-    if (dirty) {
-      setConfirmClose(true);
-      return;
-    }
-
-    closeModal();
-  }
-
-  function closeModal() {
+  const closeModal = useCallback(() => {
     setOpen(false);
     setDirty(false);
     setConfirmClose(false);
     window.setTimeout(() => openerRef.current?.focus(), 0);
-  }
+  }, []);
+
+  const requestClose = useCallback(() => {
+    if (dirty) {
+      setConfirmClose(true);
+      return;
+    }
+    closeModal();
+  }, [dirty, closeModal]);
 
   function handleSaved(successMessage: string) {
     setMessage(successMessage);
@@ -91,7 +90,7 @@ export function RenewalCreateShortcuts({
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [dirty, open]);
+  }, [open, requestClose]);
 
   return (
     <section className="rounded-[28px] border border-emerald-950/10 bg-emerald-50/70 p-4 shadow-[0_20px_46px_-36px_rgba(15,23,42,0.36)] sm:p-5">

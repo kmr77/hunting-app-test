@@ -13,17 +13,14 @@ import {
   HuntingMethod,
   HuntingPurpose,
   HuntingToolType,
-  PlanCode,
+  Prisma,
   RenewalCategory,
   RenewalStatus,
-  UserStatus,
 } from "@prisma/client";
-import { mkdir, unlink, writeFile } from "node:fs/promises";
-import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/app-data";
+import { calculateAmmoBalance, getCurrentUser } from "@/lib/app-data";
 import { withPrismaRetry } from "@/lib/prisma";
 import { resolveRenewalRule } from "@/lib/validation-rules";
 import {
@@ -32,7 +29,6 @@ import {
   normalizeLength,
   normalizePermitNumber,
   normalizeSerialNumber,
-  normalizeWhitespace,
   toHalfWidthAlnum,
 } from "@/lib/normalize";
 import { savePermitImage, deletePermitImage } from "@/lib/permit-storage";
@@ -281,8 +277,18 @@ function validateAmmoFormData(formData: FormData) {
 
   if (!rawQuantity) {
     errors.quantity = "数量を入力してください。";
-  } else if (quantity <= 0) {
-    errors.quantity = "数量は1以上で入力してください。";
+  } else if (!/^-?\d+$/.test(rawQuantity) || !Number.isSafeInteger(Number(rawQuantity)) || Math.abs(Number(rawQuantity)) > 2147483647) {
+    errors.quantity = "数量は有効な整数で入力してください。";
+  } else if (getString(formData, "recordType") === AmmoRecordType.ADJUST ? quantity === 0 : quantity <= 0) {
+    errors.quantity = "通常の数量は1以上、残数調整は0以外の増減数で入力してください。";
+  }
+
+  const recordType = getString(formData, "recordType");
+  if (!["PURCHASE", "TRANSFER_IN", "TRANSFER_OUT", "DISPOSAL", "ADJUST"].includes(recordType)) {
+    errors.recordType = "記録区分を選択してください。";
+  }
+  if (!Object.values(AmmoCategory).includes(getString(formData, "ammoCategory") as AmmoCategory)) {
+    errors.ammoCategory = "実包種別を選択してください。";
   }
 
   if (!rawCaliber) {
@@ -325,6 +331,36 @@ function subtractDays(date: Date, days: number) {
   const result = new Date(date);
   result.setDate(result.getDate() - days);
   return result;
+}
+
+async function saveAmmoRecord(userId: string, payload: ReturnType<typeof buildAmmoPayload>, id?: string | null) {
+  return withPrismaRetry((prisma) => prisma.$transaction(async (tx) => {
+    // Serialize stock-changing writes for one user before reading the balance.
+    await tx.user.update({ where: { id: userId }, data: { updatedAt: new Date() } });
+    const previous = id ? await tx.ammoRecord.findFirstOrThrow({
+      where: { id, userId, deletedAt: null },
+    }) : null;
+    const records = await tx.ammoRecord.findMany({
+      where: { userId, deletedAt: null, ...(id ? { id: { not: id } } : {}) },
+    });
+    const usage = await tx.huntingEvent.findMany({ where: { userId, deletedAt: null } });
+    const before = calculateAmmoBalance(previous ? [...records, previous] : records, usage);
+    const after = calculateAmmoBalance([...records, payload], usage);
+    const affected = calculateAmmoBalance([
+      { ...payload, recordType: AmmoRecordType.PURCHASE, quantity: 1 },
+      ...(previous ? [{ ...previous, recordType: AmmoRecordType.PURCHASE, quantity: 1 }] : []),
+    ], []);
+    if (Object.keys(after).some((key) => {
+      const category = key as keyof typeof after;
+      return affected[category] > 0 && after[category] < 0 && (payload.recordType === AmmoRecordType.ADJUST ||
+        after[category] < before[category]);
+    })) {
+      throw new Error("記録上の残弾数がマイナスになるため保存できません。数量を確認してください。");
+    }
+    return id
+      ? tx.ammoRecord.update({ where: { id, userId, deletedAt: null }, data: payload })
+      : tx.ammoRecord.create({ data: { userId, ...payload } });
+  }));
 }
 
 function getGeneratedRenewalTitle(category: RenewalCategory) {
@@ -444,6 +480,17 @@ async function requireFirearmInspectionRecord(id: string, userId: string) {
   }
 
   return inspection;
+}
+
+async function withInspectionTransaction<T>(userId: string, renewalRecordId: string, operation: (tx: Prisma.TransactionClient) => Promise<T>) {
+  return withPrismaRetry((prisma) => prisma.$transaction(async (tx) => {
+    // All transitions lock the same active permit, including schedule creation.
+    await tx.renewalRecord.update({
+      where: { id: renewalRecordId, userId, deletedAt: null, category: RenewalCategory.GUN_LICENSE },
+      data: { updatedAt: new Date() },
+    });
+    return operation(tx);
+  }));
 }
 
 function parseCompressedPermitImage(formData: FormData) {
@@ -783,28 +830,24 @@ export async function upsertRenewalAction(
   };
 
   try {
-    if (id) {
-      await requireRenewalRecord(id, user.id);
-      await withPrismaRetry((prisma) =>
-        prisma.renewalRecord.update({
-          where: { id },
+    await withPrismaRetry((prisma) => prisma.$transaction(async (tx) => {
+      if (id) {
+        await requireRenewalRecord(id, user.id);
+        await tx.renewalRecord.update({
+          where: { id, userId: user.id, deletedAt: null },
           data: payload,
-        }),
-      );
-    } else {
-      const renewal = await withPrismaRetry((prisma) =>
-        prisma.renewalRecord.create({
+        });
+      } else {
+        const renewal = await tx.renewalRecord.create({
           data: {
             userId: user.id,
             ...payload,
           },
-        }),
-      );
+        });
 
-      const serialNumber = getOptionalSerialNumber(formData, "serialNumber");
-      if (serialNumber) {
-        await withPrismaRetry((prisma) =>
-          prisma.firearmRecord.create({
+        const serialNumber = getOptionalSerialNumber(formData, "serialNumber");
+        if (serialNumber) {
+          await tx.firearmRecord.create({
             data: {
               renewalRecordId: renewal.id,
               displayName: getOptionalNormalizedText(formData, "firearmDisplayName") || undefined,
@@ -832,17 +875,15 @@ export async function upsertRenewalAction(
                 create: buildFirearmBarrelInputs(formData),
               },
             },
-          }),
-        );
+          });
+        }
       }
-    }
+    }));
   } catch (error) {
+    console.error("Failed to save renewal", error);
     return {
       success: false,
-      message:
-        error instanceof Error
-          ? error.message
-          : "更新記録の保存に失敗しました。",
+      message: "更新記録の保存に失敗しました。入力内容を確認してください。",
     };
   }
 
@@ -863,30 +904,31 @@ export async function deleteRenewalAction(
     const user = await getCurrentUser();
     await requireRenewalRecord(id, user.id);
 
-    await withPrismaRetry((prisma) =>
-      prisma.firearmRecord.updateMany({
+    await withPrismaRetry((prisma) => prisma.$transaction(async (tx) => {
+      const deletedAt = new Date();
+      // Lock the parent so inspection state changes cannot race with deletion.
+      await tx.renewalRecord.update({ where: { id, userId: user.id, deletedAt: null }, data: { deletedAt } });
+      await tx.firearmBarrelRecord.updateMany({
+        where: { firearmRecord: { renewalRecordId: id }, deletedAt: null },
+        data: { deletedAt },
+      });
+      await tx.firearmInspectionRecord.updateMany({
+        where: { renewalRecordId: id, userId: user.id, deletedAt: null },
+        data: { deletedAt },
+      });
+      await tx.firearmRecord.updateMany({
         where: { renewalRecordId: id, deletedAt: null },
-        data: { deletedAt: new Date() },
-      }),
-    );
+        data: { deletedAt },
+      });
 
-    await withPrismaRetry((prisma) =>
-      prisma.fileRecord.updateMany({
+      await tx.fileRecord.updateMany({
         where: { renewalRecordId: id, deletedAt: null },
-        data: { deletedAt: new Date() },
-      }),
-    );
-
-    await withPrismaRetry((prisma) =>
-      prisma.renewalRecord.update({
-        where: { id },
-        data: { deletedAt: new Date() },
-      }),
-    );
+        data: { deletedAt },
+      });
+    }));
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "更新記録の削除に失敗しました。";
-    return { success: false, message };
+    console.error("Failed to delete renewal", error);
+    return { success: false, message: "更新記録の削除に失敗しました。もう一度お試しください。" };
   }
 
   revalidateAppPaths("/", "/renewals", "/account");
@@ -1601,9 +1643,9 @@ export async function upsertFirearmInspectionScheduleAction(
     if (id) {
       const inspection = await requireFirearmInspectionRecord(id, user.id);
 
-      await withPrismaRetry((prisma) =>
-        prisma.firearmInspectionRecord.update({
-          where: { id: inspection.id },
+      await withInspectionTransaction(user.id, inspection.renewalRecordId, (tx) =>
+        tx.firearmInspectionRecord.update({
+          where: { id: inspection.id, userId: user.id, deletedAt: null, status: FirearmInspectionStatus.SCHEDULED },
           data: {
             scheduledOn: safeScheduledOn,
             notes,
@@ -1613,8 +1655,8 @@ export async function upsertFirearmInspectionScheduleAction(
     } else {
       await requireGunLicenseRenewalRecord(renewalRecordId, user.id);
 
-      const existingScheduled = await withPrismaRetry((prisma) =>
-        prisma.firearmInspectionRecord.findFirst({
+      await withInspectionTransaction(user.id, renewalRecordId, async (tx) => {
+        const existingScheduled = await tx.firearmInspectionRecord.findFirst({
           where: {
             userId: user.id,
             renewalRecordId,
@@ -1622,33 +1664,28 @@ export async function upsertFirearmInspectionScheduleAction(
             deletedAt: null,
           },
           select: { id: true },
-        }),
-      );
+        });
 
-      if (existingScheduled) {
-        return {
-          success: false,
-          message:
-            "未実施の銃検予定がすでにあります。既存の予定を編集してください。",
-        };
-      }
+        if (existingScheduled) {
+          throw new Error("未実施の銃検予定がすでにあります。既存の予定を編集してください。");
+        }
 
-      await withPrismaRetry((prisma) =>
-        prisma.firearmInspectionRecord.create({
+        await tx.firearmInspectionRecord.create({
           data: {
             userId: user.id,
             renewalRecordId,
             scheduledOn: safeScheduledOn,
             notes,
           },
-        }),
-      );
+        });
+      });
     }
   } catch (error) {
     console.error("Failed to save firearm inspection schedule", error);
     return {
       success: false,
-      message: "銃検情報の保存に失敗しました。入力内容を確認してください。",
+      message: error instanceof Error && error.message.startsWith("未実施の銃検予定がすでに")
+        ? error.message : "銃検情報の保存に失敗しました。入力内容を確認してください。",
     };
   }
 
@@ -1691,9 +1728,9 @@ export async function completeFirearmInspectionAction(
       };
     }
 
-    await withPrismaRetry((prisma) =>
-      prisma.firearmInspectionRecord.update({
-        where: { id: inspection.id },
+    await withInspectionTransaction(user.id, inspection.renewalRecordId, (tx) =>
+      tx.firearmInspectionRecord.update({
+        where: { id: inspection.id, userId: user.id, deletedAt: null, status: FirearmInspectionStatus.SCHEDULED },
         data: {
           status: FirearmInspectionStatus.COMPLETED,
           inspectedOn: inspectedOn as Date,
@@ -1753,9 +1790,9 @@ export async function updateCompletedFirearmInspectionAction(
     const user = await getCurrentUser();
     const inspection = await requireFirearmInspectionRecord(id, user.id);
 
-    await withPrismaRetry((prisma) =>
-      prisma.firearmInspectionRecord.update({
-        where: { id: inspection.id },
+    await withInspectionTransaction(user.id, inspection.renewalRecordId, (tx) =>
+      tx.firearmInspectionRecord.update({
+        where: { id: inspection.id, userId: user.id, deletedAt: null, status: FirearmInspectionStatus.COMPLETED },
         data: {
           scheduledOn: scheduledOn as Date,
           status: FirearmInspectionStatus.COMPLETED,
@@ -1790,21 +1827,27 @@ export async function reopenFirearmInspectionAction(
     const user = await getCurrentUser();
     const inspection = await requireFirearmInspectionRecord(id, user.id);
 
-    await withPrismaRetry((prisma) =>
-      prisma.firearmInspectionRecord.update({
-        where: { id: inspection.id },
+    await withInspectionTransaction(user.id, inspection.renewalRecordId, async (tx) => {
+      const existing = await tx.firearmInspectionRecord.findFirst({
+        where: { renewalRecordId: inspection.renewalRecordId, userId: user.id,
+          status: FirearmInspectionStatus.SCHEDULED, deletedAt: null, id: { not: inspection.id } },
+      });
+      if (existing) throw new Error("未実施の銃検予定がすでにあります。既存の予定を確認してください。");
+      await tx.firearmInspectionRecord.update({
+        where: { id: inspection.id, userId: user.id, deletedAt: null },
         data: {
           status: FirearmInspectionStatus.SCHEDULED,
           inspectedOn: null,
           completedAt: null,
         },
-      }),
-    );
+      });
+    });
   } catch (error) {
     console.error("Failed to reopen firearm inspection", error);
     return {
       success: false,
-      message: "銃検済みの取り消しに失敗しました。",
+      message: error instanceof Error && error.message.startsWith("未実施の銃検予定がすでに")
+        ? error.message : "銃検済みの取り消しに失敗しました。",
     };
   }
 
@@ -1840,7 +1883,7 @@ export async function deleteFirearmRecordAction(formData: FormData) {
       throw new Error("所持銃情報が見つかりません。");
     }
 
-    await withPrismaRetry((prisma) =>
+    await withPrismaRetry((prisma) => prisma.$transaction([
       prisma.firearmBarrelRecord.updateMany({
         where: {
           firearmRecordId: firearm.id,
@@ -1848,14 +1891,11 @@ export async function deleteFirearmRecordAction(formData: FormData) {
         },
         data: { deletedAt: new Date() },
       }),
-    );
-
-    await withPrismaRetry((prisma) =>
       prisma.firearmRecord.update({
         where: { id: firearm.id },
         data: { deletedAt: new Date() },
       }),
-    );
+    ]));
   } catch (error) {
     redirectWithMessage(
       pathname,
@@ -2000,6 +2040,9 @@ export async function upsertAmmoAction(formData: FormData) {
   const target = id ? `ammo-record-${id}` : "ammo-new";
   const validation = validateAmmoFormData(formData);
 
+  if (validation.errors.recordType || validation.errors.ammoCategory) {
+    redirectWithMessage(pathname, "error", "記録区分と実包種別を確認してください。", target);
+  }
   if (validation.errors.transactionDate) {
     redirectWithFieldMessage(
       pathname,
@@ -2034,27 +2077,11 @@ export async function upsertAmmoAction(formData: FormData) {
 
   try {
     const user = await getCurrentUser();
-    if (id) {
-      await requireAmmoRecord(id, user.id);
-      await withPrismaRetry((prisma) =>
-        prisma.ammoRecord.update({
-          where: { id },
-          data: payload,
-        }),
-      );
-    } else {
-      await withPrismaRetry((prisma) =>
-        prisma.ammoRecord.create({
-          data: {
-            userId: user.id,
-            ...payload,
-          },
-        }),
-      );
-    }
+    await saveAmmoRecord(user.id, payload, id);
   } catch (error) {
     console.error("Failed to save ammo record", error);
-    redirectWithMessage(pathname, "error", "実包記録の保存に失敗しました。", target);
+    redirectWithMessage(pathname, "error", error instanceof Error && error.message.startsWith("記録上の残弾数")
+      ? error.message : "実包記録の保存に失敗しました。", target);
   }
 
   revalidateAppPaths("/", "/ammo", "/account");
@@ -2083,19 +2110,13 @@ export async function createAmmoAction(
 
   try {
     const user = await getCurrentUser();
-    await withPrismaRetry((prisma) =>
-      prisma.ammoRecord.create({
-        data: {
-          userId: user.id,
-          ...buildAmmoPayload(formData),
-        },
-      }),
-    );
+    await saveAmmoRecord(user.id, buildAmmoPayload(formData));
   } catch (error) {
     console.error("Failed to create ammo record", error);
     return {
       success: false,
-      message: "実包記録の保存に失敗しました。入力内容を確認してください。",
+      message: error instanceof Error && error.message.startsWith("記録上の残弾数")
+        ? error.message : "実包記録の保存に失敗しました。入力内容を確認してください。",
       values,
     };
   }
@@ -2214,7 +2235,9 @@ export async function upsertHuntingEventAction(formData: FormData) {
     redirectWithMessage(pathname, "error", "保存に失敗しました。");
   }
 
-  if (!selectedFirearmRecordId) {
+  const usesFirearm = activityType === ActivityType.SHOOTING ||
+    getString(formData, "huntingMethod") === HuntingMethod.GUN;
+  if (usesFirearm && !selectedFirearmRecordId) {
     redirectWithMessage(pathname, "error", "使用道具を選択してください。");
   }
 
@@ -2268,86 +2291,42 @@ export async function upsertHuntingEventAction(formData: FormData) {
 
   try {
     const user = await getCurrentUser();
-    const selectedFirearmTool = await requireReportFirearmTool(
+    const selectedFirearmTool = selectedFirearmRecordId ? await requireReportFirearmTool(
       user.id,
       selectedFirearmRecordId,
       selectedFirearmBarrelRecordId,
-    );
+    ) : null;
     const resolvedToolName = selectedFirearmTool?.toolName ?? toolName;
     const resolvedToolNotes =
       selectedFirearmTool?.notes ?? getOptionalString(formData, "toolNotes");
 
-    if (id) {
-      await requireHuntingEvent(id, user.id);
+    await withPrismaRetry((prisma) => prisma.$transaction(async (tx) => {
+      if (id) await requireHuntingEvent(id, user.id);
+      await tx.user.update({ where: { id: user.id }, data: { updatedAt: new Date() } });
+      const event = id
+        ? await tx.huntingEvent.update({ where: { id, userId: user.id, deletedAt: null }, data: payload })
+        : await tx.huntingEvent.create({ data: { userId: user.id, ...payload } });
 
-      await withPrismaRetry((prisma) =>
-        prisma.huntingEvent.update({
-          where: { id },
-          data: payload,
-        }),
-      );
-
-      await withPrismaRetry((prisma) =>
-        prisma.huntingEventTool.updateMany({
-          where: {
-            huntingEventId: id,
-            deletedAt: null,
-          },
-          data: {
-            deletedAt: new Date(),
-          },
-        }),
-      );
-
-      if (resolvedToolName) {
-        await withPrismaRetry((prisma) =>
-          prisma.huntingEventTool.create({
-            data: {
-              huntingEventId: id,
-              firearmRecordId: selectedFirearmTool?.firearmRecordId ?? null,
-              firearmBarrelRecordId:
-                selectedFirearmTool?.firearmBarrelRecordId ?? null,
-              toolType:
-                (getOptionalString(formData, "toolType") as HuntingToolType) ??
-                HuntingToolType.FIREARM,
-              toolName: resolvedToolName,
-              quantity:
-                activityType === ActivityType.SHOOTING ? null : toolQuantity,
-              notes: resolvedToolNotes,
-            },
-          }),
-        );
+      if (id) {
+        await tx.huntingEventTool.updateMany({
+          where: { huntingEventId: id, deletedAt: null },
+          data: { deletedAt: new Date() },
+        });
       }
-    } else {
-      const event = await withPrismaRetry((prisma) =>
-        prisma.huntingEvent.create({
-          data: {
-            userId: user.id,
-            ...payload,
-          },
-        }),
-      );
-
       if (resolvedToolName) {
-        await withPrismaRetry((prisma) =>
-          prisma.huntingEventTool.create({
-            data: {
-              huntingEventId: event.id,
-              firearmRecordId: selectedFirearmTool?.firearmRecordId ?? null,
-              firearmBarrelRecordId:
-                selectedFirearmTool?.firearmBarrelRecordId ?? null,
-              toolType:
-                (getOptionalString(formData, "toolType") as HuntingToolType) ??
-                HuntingToolType.FIREARM,
-              toolName: resolvedToolName,
-              quantity:
-                activityType === ActivityType.SHOOTING ? null : toolQuantity,
-              notes: resolvedToolNotes,
-            },
-          }),
-        );
+        await tx.huntingEventTool.create({
+          data: {
+            huntingEventId: event.id,
+            firearmRecordId: selectedFirearmTool?.firearmRecordId ?? null,
+            firearmBarrelRecordId: selectedFirearmTool?.firearmBarrelRecordId ?? null,
+            toolType: (getOptionalString(formData, "toolType") as HuntingToolType) ?? HuntingToolType.FIREARM,
+            toolName: resolvedToolName,
+            quantity: activityType === ActivityType.SHOOTING ? null : toolQuantity,
+            notes: resolvedToolNotes,
+          },
+        });
       }
-    }
+    }));
   } catch (error) {
     console.error("Failed to save hunting event", error);
     redirectWithMessage(
@@ -2377,19 +2356,16 @@ export async function deleteHuntingEventAction(formData: FormData) {
     const user = await getCurrentUser();
     await requireHuntingEvent(id, user.id);
 
-    await withPrismaRetry((prisma) =>
+    await withPrismaRetry((prisma) => prisma.$transaction([
       prisma.huntingEventTool.updateMany({
         where: { huntingEventId: id, deletedAt: null },
         data: { deletedAt: new Date() },
       }),
-    );
-
-    await withPrismaRetry((prisma) =>
       prisma.huntingEvent.update({
         where: { id },
         data: { deletedAt: new Date() },
       }),
-    );
+    ]));
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "活動記録の削除に失敗しました。";
@@ -2460,6 +2436,9 @@ export async function toggleImportedToReportAction(formData: FormData) {
 
 export async function updateAccountAction(formData: FormData) {
   const pathname = "/account";
+  if (["status", "planCode", "role", "paidUntil"].some((key) => formData.has(key))) {
+    redirectWithMessage(pathname, "error", "権限・プラン・利用状態は変更できません。");
+  }
   const email = getString(formData, "email");
   const lastName = getString(formData, "lastName");
   const firstName = getString(formData, "firstName");
@@ -2497,20 +2476,16 @@ export async function updateAccountAction(formData: FormData) {
     const user = await getCurrentUser();
     const profile = user.profile;
 
-    await withPrismaRetry((prisma) =>
-      prisma.user.update({
+    await withPrismaRetry((prisma) => prisma.$transaction(async (tx) => {
+      await tx.user.update({
         where: { id: user.id },
         data: {
           email,
-          status: getString(formData, "status") as UserStatus,
-          planCode: getString(formData, "planCode") as PlanCode,
         },
-      }),
-    );
+      });
 
-    if (profile) {
-      await withPrismaRetry((prisma) =>
-        prisma.userProfile.update({
+      if (profile) {
+        await tx.userProfile.update({
           where: { id: profile.id },
           data: {
             lastName,
@@ -2522,13 +2497,12 @@ export async function updateAccountAction(formData: FormData) {
             addressLine1: getOptionalString(formData, "addressLine1"),
             addressLine2: getOptionalString(formData, "addressLine2"),
           },
-        }),
-      );
-    }
+        });
+      }
+    }));
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "アカウント更新に失敗しました。";
-    redirectWithMessage(pathname, "error", message);
+    console.error("Failed to update account", error);
+    redirectWithMessage(pathname, "error", "アカウント更新に失敗しました。入力内容を確認してください。");
   }
 
   revalidateAppPaths("/", "/account");

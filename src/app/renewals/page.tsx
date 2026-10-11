@@ -2,6 +2,7 @@ import {
   deleteRenewalPermitImageAction,
   uploadRenewalPermitImageAction,
 } from "@/app/actions";
+import Image from "next/image";
 import { FeedbackBanner } from "@/components/feedback-banner";
 import { RenewalCreateShortcuts } from "@/components/renewals/renewal-create-shortcuts";
 import { RenewalDeleteForm } from "@/components/renewals/renewal-delete-form";
@@ -10,8 +11,6 @@ import { RenewalRecordCard } from "@/components/renewals/renewal-record-card";
 import { SubmitButton } from "@/components/submit-button";
 import { FileCategory, RenewalCategory } from "@prisma/client";
 import {
-  firearmStatusOptions,
-  firearmTypeOptions,
   getDataLoadErrorMessage,
   getRenewalPageData,
   getRenewalPageDataFallback,
@@ -234,8 +233,11 @@ export default async function RenewalsPage({
                                 rel="noreferrer"
                                 className="block overflow-hidden rounded-[18px] border border-slate-200 bg-white"
                               >
-                                <img
+                                <Image
                                   src={permitImage.storageKey}
+                                  width={1200}
+                                  height={900}
+                                  unoptimized
                                   alt={`${renewal.title}の許可証画像`}
                                   className="max-h-80 w-full object-contain"
                                 />

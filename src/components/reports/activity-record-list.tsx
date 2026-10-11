@@ -51,7 +51,6 @@ const huntingPurposeOptions = [
 
 type ReportPageData = Awaited<ReturnType<typeof getReportPageData>>;
 type ActivityEvent = ReportPageData["huntingEvents"][number];
-type EventTool = ActivityEvent["huntingEventTools"][number] | undefined;
 
 type ActivityRecordListProps = {
   huntingEvents: ReportPageData["huntingEvents"];
@@ -288,6 +287,7 @@ function ActivityRecordEditForm({
   const primaryTool = event.huntingEventTools[0];
   const selectedToolValue = getToolSelectionValue(primaryTool);
   const isShooting = event.activityType === ActivityType.SHOOTING;
+  const [huntingMethod, setHuntingMethod] = useState(event.huntingMethod ?? HuntingMethod.GUN);
 
   return (
     <form action={upsertHuntingEventAction} className="grid gap-3">
@@ -378,7 +378,8 @@ function ActivityRecordEditForm({
               <span className={formLabelText}>猟法</span>
               <select
                 name="huntingMethod"
-                defaultValue={event.huntingMethod ?? HuntingMethod.GUN}
+                value={huntingMethod}
+                onChange={(event) => setHuntingMethod(event.target.value as HuntingMethod)}
                 className={formFieldCompact}
               >
                 {huntingMethodOptions.map((option) => (
@@ -460,10 +461,10 @@ function ActivityRecordEditForm({
               />
             </label>
           </div>
-          <FirearmToolEditField
+          {huntingMethod === HuntingMethod.GUN ? <FirearmToolEditField
             firearmToolOptions={firearmToolOptions}
             initialValue={selectedToolValue}
-          />
+          /> : null}
         </>
       )}
 
@@ -510,8 +511,6 @@ export function ActivityRecordList({
   return (
     <section className="grid gap-4">
       {huntingEvents.map((event) => {
-        const primaryTool: EventTool = event.huntingEventTools[0];
-        const selectedToolValue = getToolSelectionValue(primaryTool);
         const isShooting = event.activityType === ActivityType.SHOOTING;
         const isEditing = editingId === event.id;
 

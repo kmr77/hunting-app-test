@@ -75,7 +75,7 @@ export default async function Home() {
               ひと目で確認できます
             </h2>
             <p className="max-w-2xl text-sm leading-7 text-emerald-50/90">
-              更新期限、実包登録数、活動記録の転記待ちをまとめて確認するための
+              更新期限、記録上の残弾数、活動記録の転記待ちをまとめて確認するための
               ローカル業務アプリです。日常の記録をスマホ中心で扱える前提に
               整えています。
             </p>
@@ -115,7 +115,7 @@ export default async function Home() {
         </article>
         <article className="rounded-[28px] border border-emerald-950/10 bg-white/92 p-5 shadow-[0_22px_40px_-32px_rgba(15,23,42,0.34)]">
           <p className="text-xs font-semibold tracking-[0.18em] text-slate-500 uppercase">
-            実包登録
+            記録上の残弾数
           </p>
           <p className="mt-3 text-3xl font-semibold text-slate-950">
             {summary.ammoRegisteredCount} 発

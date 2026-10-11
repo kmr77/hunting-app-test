@@ -12,8 +12,6 @@ import { SubmitButton } from "@/components/submit-button";
 import {
   getDataLoadErrorMessage,
   getAccountPageData,
-  planCodeOptions,
-  userStatusOptions,
   type AccountPageData,
 } from "@/lib/app-data";
 import {
@@ -65,7 +63,7 @@ export default async function AccountPage({
               固定利用者のプロフィールを管理
             </h2>
             <p className="max-w-2xl text-sm leading-7 text-slate-600">
-              MVP では認証前提を入れず、1人分のプロフィールと状態だけを更新します。
+              MVP では認証前提を入れず、1人分のプロフィールを更新します。権限・プラン・利用状態は変更できません。
             </p>
           </div>
 
@@ -163,36 +161,6 @@ export default async function AccountPage({
                     : undefined
                 }
               />
-            </label>
-
-            <label className={formFieldLabel}>
-              <span className={formLabelText}>利用状態</span>
-              <select
-                name="status"
-                defaultValue={data?.status ?? "ACTIVE"}
-                className={formFieldBase}
-              >
-                {userStatusOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {userStatusLabels[option]}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className={formFieldLabel}>
-              <span className={formLabelText}>プラン</span>
-              <select
-                name="planCode"
-                defaultValue={data?.planCode ?? "FREE"}
-                className={formFieldBase}
-              >
-                {planCodeOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {planCodeLabels[option]}
-                  </option>
-                ))}
-              </select>
             </label>
 
             <label className={formFieldLabel + " lg:col-span-3"}>

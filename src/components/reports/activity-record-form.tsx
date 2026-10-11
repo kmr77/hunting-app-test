@@ -18,7 +18,6 @@ import {
 } from "@/lib/labels";
 import {
   formFieldBase,
-  formFieldCompact,
   formFieldLabel,
   formGrid3,
   formGrid4,
@@ -192,6 +191,7 @@ function FirearmToolSelector({
         <span className={formLabelText}>使用道具</span>
         <select
           name="firearmToolSelection"
+          required
           value={selectedValue}
           onChange={(event) => onSelect(event.target.value)}
           className={formFieldBase}
@@ -269,6 +269,7 @@ export function ActivityRecordForm({
     }));
   };
   const isHunting = activityType === ActivityType.HUNTING;
+  const [huntingMethod, setHuntingMethod] = useState("GUN");
   const formToneClass = isHunting
     ? "border-emerald-900/15 bg-emerald-50/80"
     : "border-sky-900/15 bg-sky-50/85";
@@ -333,7 +334,8 @@ export function ActivityRecordForm({
               <span className={formLabelText}>猟法</span>
               <select
                 name="huntingMethod"
-                defaultValue="GUN"
+                value={huntingMethod}
+                onChange={(event) => setHuntingMethod(event.target.value)}
                 className={formFieldBase}
               >
                 {huntingMethodOptions.map((option) => (
@@ -402,7 +404,7 @@ export function ActivityRecordForm({
             />
           </div>
 
-          <div className="mt-5 rounded-[24px] border border-emerald-950/10 bg-white/78 p-4">
+          {huntingMethod === "GUN" ? <div className="mt-5 rounded-[24px] border border-emerald-950/10 bg-white/78 p-4">
             <div className="mb-3">
               <p className="text-sm font-semibold text-slate-900">
                 使用道具 1件
@@ -416,7 +418,7 @@ export function ActivityRecordForm({
               selectedValue={selectedToolValue}
               onSelect={setSelectedToolValue}
             />
-          </div>
+          </div> : null}
         </>
       ) : (
         <div

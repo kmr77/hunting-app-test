@@ -30,12 +30,21 @@ const DEMO_PASSWORD_HASH = "local-demo-password-not-used";
 
 export async function ensureDemoUser() {
   return withPrismaRetry(async (prisma) => {
-    const existing = await prisma.user.findUnique({
-      where: { email: DEMO_EMAIL },
+    // Temporary demo identity uses an immutable marker, not the editable email.
+    // Replace this lookup with the authenticated user ID when authentication is added.
+    const existing = await prisma.user.findFirst({
+      where: process.env.DEMO_USER_ID
+        ? { id: process.env.DEMO_USER_ID }
+        : { passwordHash: DEMO_PASSWORD_HASH },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       include: {
         profile: true,
       },
     });
+
+    if (process.env.DEMO_USER_ID && !existing) {
+      throw new Error("デモ利用者の設定を確認してください。");
+    }
 
     if (existing?.profile) {
       return existing;
@@ -88,8 +97,9 @@ export async function ensureDemoUser() {
         },
       });
     } catch {
-      return prisma.user.findUniqueOrThrow({
-        where: { email: DEMO_EMAIL },
+      return prisma.user.findFirstOrThrow({
+        where: { passwordHash: DEMO_PASSWORD_HASH },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         include: {
           profile: true,
         },
@@ -215,6 +225,7 @@ export async function getDashboardSummary() {
       },
       select: {
         recordType: true,
+        ammoCategory: true,
         quantity: true,
       },
     }),
@@ -232,10 +243,14 @@ export async function getDashboardSummary() {
     }),
   );
 
-  const ammoRegisteredCount = ammoRecords.reduce(
-    (total, record) => total + record.quantity,
-    0,
+  const usageRows = await withPrismaRetry((prisma) =>
+    prisma.huntingEvent.findMany({
+      where: { userId: user.id, deletedAt: null },
+      select: { shotShellUsedCount: true, slugUsedCount: true, airgunPelletUsedCount: true },
+    }),
   );
+  const balance = calculateAmmoBalance(ammoRecords, usageRows);
+  const ammoRegisteredCount = balance.shotShell + balance.slug + balance.airgunPellet;
 
   return {
     renewals,
@@ -625,7 +640,7 @@ function getAmmoQuantitySign(recordType: AmmoRecordType) {
   return 1;
 }
 
-function calculateAmmoBalance(
+export function calculateAmmoBalance(
   ammoRecords: AmmoBalanceSourceRecord[],
   usageRows: AmmoUsageSourceRecord[],
 ) {
@@ -636,6 +651,7 @@ function calculateAmmoBalance(
   };
 
   for (const record of ammoRecords) {
+    if (record.recordType === AmmoRecordType.CONSUME) continue;
     const quantity = record.quantity * getAmmoQuantitySign(record.recordType);
 
     if (record.ammoCategory === AmmoCategory.SHOT_SHELL) {

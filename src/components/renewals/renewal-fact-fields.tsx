@@ -178,7 +178,7 @@ export function RenewalFactFields({
         help: "今日から更新予定日までの日数です。",
       },
     ],
-    [category, daysUntil, reminderStartOn, targetDate],
+    [category, daysUntil, reminderStartOn, targetDate, reminderLeadDaysHelp],
   );
 
   function handleCategoryChange(value: RenewalCategoryValue) {

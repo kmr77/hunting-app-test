@@ -23,6 +23,7 @@ import {
   updateHuntingLicenseInfoAction,
   updateRenewalPermitInfoAction,
   upsertFirearmInspectionScheduleAction,
+  type RenewalActionResult,
 } from "@/app/actions";
 import { DateInput } from "@/components/date-input";
 import {
@@ -259,7 +260,7 @@ export function RenewalRecordCard({
   const [editing, setEditing] = useState<"permit" | "firearm" | string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [selectedBarrelIds, setSelectedBarrelIds] = useState<string[]>([]);
-  const [primaryBarrelId, setPrimaryBarrelId] = useState(actualPrimaryBarrelId);
+  const primaryBarrelId = actualPrimaryBarrelId;
   const [permitOriginalPermittedOn, setPermitOriginalPermittedOn] = useState(
     renewal.originalPermittedOn ?? "",
   );
@@ -299,10 +300,6 @@ export function RenewalRecordCard({
   }
 
   useEffect(() => {
-    setPrimaryBarrelId(actualPrimaryBarrelId);
-  }, [actualPrimaryBarrelId]);
-
-  useEffect(() => {
     if (!primaryBarrelState) {
       return;
     }
@@ -312,8 +309,7 @@ export function RenewalRecordCard({
       return;
     }
 
-    setPrimaryBarrelId(actualPrimaryBarrelId);
-  }, [actualPrimaryBarrelId, primaryBarrelState, router]);
+  }, [primaryBarrelState, router]);
 
   const accordionPanelId = `renewal-details-${renewal.id}`;
   const isGunLicense = renewal.category === "GUN_LICENSE";
@@ -592,7 +588,6 @@ export function RenewalRecordCard({
                   selected={selectedBarrelIds.includes(barrel.id)}
                   isPrimary={primaryBarrelId === barrel.id}
                   onSelect={(checked) => toggleBarrelSelection(barrel.id, checked)}
-                  onPrimarySelect={() => setPrimaryBarrelId(barrel.id)}
                   onEdit={() => setEditing(barrel.id)}
                   onCancel={() => setEditing(null)}
                   state={barrelState}
@@ -647,22 +642,6 @@ function FirearmInspectionSection({
   renewalRecordId: string;
   inspections: FirearmInspection[];
 }) {
-  const [scheduleState, scheduleAction] = useActionState(
-    upsertFirearmInspectionScheduleAction,
-    null,
-  );
-  const [completeState, completeAction] = useActionState(
-    completeFirearmInspectionAction,
-    null,
-  );
-  const [completedUpdateState, completedUpdateAction] = useActionState(
-    updateCompletedFirearmInspectionAction,
-    null,
-  );
-  const [reopenState, reopenAction] = useActionState(
-    reopenFirearmInspectionAction,
-    null,
-  );
   const [mode, setMode] = useState<
     | { type: "new" }
     | { type: "edit-scheduled"; id: string }
@@ -670,6 +649,28 @@ function FirearmInspectionSection({
     | { type: "edit-completed"; id: string }
     | null
   >(null);
+  async function runInspectionAction(action: (previous: RenewalActionResult | null, data: FormData) => Promise<RenewalActionResult>, previous: RenewalActionResult | null, data: FormData) {
+    const result = await action(previous, data);
+    if (result.success) setMode(null);
+    return result;
+  }
+
+  const [scheduleState, scheduleAction] = useActionState(
+    (previous: RenewalActionResult | null, data: FormData) => runInspectionAction(upsertFirearmInspectionScheduleAction, previous, data),
+    null,
+  );
+  const [completeState, completeAction] = useActionState(
+    (previous: RenewalActionResult | null, data: FormData) => runInspectionAction(completeFirearmInspectionAction, previous, data),
+    null,
+  );
+  const [completedUpdateState, completedUpdateAction] = useActionState(
+    (previous: RenewalActionResult | null, data: FormData) => runInspectionAction(updateCompletedFirearmInspectionAction, previous, data),
+    null,
+  );
+  const [reopenState, reopenAction] = useActionState(
+    (previous: RenewalActionResult | null, data: FormData) => runInspectionAction(reopenFirearmInspectionAction, previous, data),
+    null,
+  );
   const [feedbackTarget, setFeedbackTarget] = useState<
     "schedule" | "complete" | "completed-update" | "reopen" | "keep" | null
   >(null);
@@ -682,21 +683,6 @@ function FirearmInspectionSection({
     .filter((inspection) => inspection.status === "COMPLETED")
     .sort((a, b) => b.scheduledOn.localeCompare(a.scheduledOn));
 
-  useEffect(() => {
-    if (
-      scheduleState?.success ||
-      completeState?.success ||
-      completedUpdateState?.success ||
-      reopenState?.success
-    ) {
-      setMode(null);
-    }
-  }, [
-    scheduleState,
-    completeState,
-    completedUpdateState,
-    reopenState,
-  ]);
 
   return (
     <section
@@ -1224,7 +1210,7 @@ function FirearmView({
   );
 }
 
-function FirearmForm({ firearm, onCancel, state, action }: { firearm: Firearm; onCancel: () => void; state: any; action: any }) {
+function FirearmForm({ firearm, onCancel, state, action }: { firearm: Firearm; onCancel: () => void; state: RenewalActionResult | null; action: (data: FormData) => void }) {
   return (
     <>
       <form action={action} className="grid gap-3 border-t border-slate-200 pt-4">
@@ -1292,7 +1278,6 @@ function BarrelCard({
   selected,
   isPrimary,
   onSelect,
-  onPrimarySelect,
   onEdit,
   onCancel,
   state,
@@ -1305,12 +1290,11 @@ function BarrelCard({
   selected: boolean;
   isPrimary: boolean;
   onSelect: (checked: boolean) => void;
-  onPrimarySelect: () => void;
   onEdit: () => void;
   onCancel: () => void;
-  state: any;
-  action: any;
-  primaryAction: any;
+  state: RenewalActionResult | null;
+  action: (data: FormData) => void;
+  primaryAction: (data: FormData) => void;
 }) {
   const items: Item[] = [
     { label: "本銃身", value: isPrimary ? "現在の本銃身" : "いいえ" },
@@ -1388,7 +1372,6 @@ function BarrelCard({
                   name="primaryBarrel"
                   checked={isPrimary}
                   onChange={(event) => {
-                    onPrimarySelect();
                     event.currentTarget.form?.requestSubmit();
                   }}
                   className="size-4 accent-emerald-700"
